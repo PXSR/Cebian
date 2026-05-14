@@ -9,7 +9,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 import { t } from '@/lib/i18n';
 import { applyTheme, resolveTheme } from './lib/theme';
-import { BINARY_EXTS, fileExtension, formatSize, getHashPath, navigateTo } from './lib/path-utils';
+import { BINARY_EXTS, MARKDOWN_EXTS, fileExtension, getHashPath, navigateTo } from './lib/path-utils';
 import { zipDirectory, zipNameFor } from './lib/download';
 import { Breadcrumbs } from './ui/Breadcrumbs';
 import { DirView } from './ui/DirView';
@@ -78,10 +78,14 @@ export default function App() {
         } else {
           const ext = fileExtension(p.split('/').pop() ?? '');
           if (BINARY_EXTS.has(ext)) {
-            if (!stale) setView({ kind: 'file', path: p, content: t('vfs.binaryFile', [formatSize(st.size)]), size: st.size, isBinary: true });
+            if (!stale) setView({ kind: 'file', path: p, media: { type: 'binary', size: st.size } });
           } else {
             const raw = (await vfs.readFile(p, 'utf8')) as unknown as string;
-            if (!stale) setView({ kind: 'file', path: p, content: raw, size: st.size, isBinary: false });
+            // Task 2 split: route .md / .markdown into the markdown branch
+            // so Task 4 can render with MarkdownRenderer. Other text files
+            // (source code, .txt, .json, etc.) stay as plain text.
+            const type = MARKDOWN_EXTS.has(ext) ? 'markdown' : 'text';
+            if (!stale) setView({ kind: 'file', path: p, media: { type, content: raw, size: st.size } });
           }
         }
       } catch (err: any) {
@@ -191,7 +195,7 @@ export default function App() {
 
             {view.kind === 'dir' && <DirView path={view.path} entries={view.entries} />}
 
-            {view.kind === 'file' && <FileView path={view.path} content={view.content} size={view.size} isBinary={view.isBinary} />}
+            {view.kind === 'file' && <FileView path={view.path} media={view.media} />}
 
             {view.kind === 'error' && (
               <div className="flex flex-col items-center justify-center py-20 gap-3">

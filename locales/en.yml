@@ -431,6 +431,10 @@ vfs:
   lines: "$1 ln"
   # $1 = formatted file size
   binaryFile: "[Binary file — $1]"
+  # $1 = formatted file size
+  tooLargeToPreview: "File too large to preview — $1. Use Download instead."
+  preview: "Preview"
+  viewSource: "View source"
   # $1 = path
   pathNotFound: "Path not found: $1"
   unknownError: "Unknown error"

@@ -428,6 +428,10 @@ vfs:
   lines: "$1 行"
   # $1 = 格式化后的文件大小
   binaryFile: "[二进制文件 — $1]"
+  # $1 = 格式化后的文件大小
+  tooLargeToPreview: "文件太大，无法预览（$1）。请改用下载。"
+  preview: "预览"
+  viewSource: "查看源码"
   # $1 = 路径
   pathNotFound: "路径不存在：$1"
   unknownError: "未知错误"
