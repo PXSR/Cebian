@@ -5,13 +5,16 @@ export interface DirEntry {
 }
 
 /** Discriminated union of file rendering modes. The loader picks the type
- *  via `classifyFile` + size check; `FileView` switches on `type`. */
+ *  via `classifyFile` + size check; `FileView` switches on `type`. Media
+ *  variants (image/video/audio) carry a blob `url` whose lifetime is owned
+ *  by the loader — it is revoked when a new file is loaded or the
+ *  component unmounts. */
 export type FileMedia =
   | { type: 'text'; content: string; size: number }
   | { type: 'markdown'; content: string; size: number }
-  | { type: 'image'; mime: string; size: number }
-  | { type: 'video'; mime: string; size: number }
-  | { type: 'audio'; mime: string; size: number }
+  | { type: 'image'; mime: string; size: number; url: string }
+  | { type: 'video'; mime: string; size: number; url: string }
+  | { type: 'audio'; mime: string; size: number; url: string }
   | { type: 'binary'; size: number }
   | { type: 'tooLarge'; size: number };
 

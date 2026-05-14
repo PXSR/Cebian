@@ -1,10 +1,11 @@
 import { File, FileCode, FileText, type LucideIcon } from 'lucide-react';
 import { normalizePath } from '@/lib/vfs';
 
-/** Extensions that the loader should NOT try to read as utf8 text. Today
- *  the loader consults this set directly. Task 3 will switch the loader to
- *  route through `classifyFile` first, so the media buckets (image/video/
- *  audio) win before this fallback even though some extensions overlap. */
+/** Extensions that the loader treats as binary (no inline preview, no utf8
+ *  read). Some media extensions (e.g. `png`, `mp4`) also appear here as a
+ *  safety net — `classifyFile` routes the dedicated image/video/audio
+ *  buckets first, so this set only matches "binary blobs we don't render"
+ *  like archives, fonts, and PDFs. */
 export const BINARY_EXTS = new Set([
   'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp',
   'pdf', 'zip', 'gz', 'tar',

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Download, Loader2 } from 'lucide-react';
 import { vfs } from '@/lib/vfs';
@@ -9,12 +9,12 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 import { t } from '@/lib/i18n';
 import { applyTheme, resolveTheme } from './lib/theme';
-import { BINARY_EXTS, MARKDOWN_EXTS, fileExtension, getHashPath, navigateTo } from './lib/path-utils';
+import { MAX_PREVIEW_BYTES, classifyFile, fileExtension, getHashPath, mimeFor, navigateTo } from './lib/path-utils';
 import { zipDirectory, zipNameFor } from './lib/download';
 import { Breadcrumbs } from './ui/Breadcrumbs';
 import { DirView } from './ui/DirView';
 import { FileView } from './ui/FileView';
-import type { ViewState } from './types';
+import type { FileMedia, ViewState } from './types';
 
 export default function App() {
   const [theme] = useStorageItem(themePreference, 'system');
@@ -49,19 +49,45 @@ export default function App() {
   }, [theme]);
 
   // ── Load path from hash ──
+  //
+  // Two pieces of cross-call state live in refs:
+  //
+  // 1. `loadIdRef` — every call to loadPath() captures a monotonically
+  //    increasing id at entry and re-checks it after each await. A rapid
+  //    sequence of hashchange events (or a hashchange that fires while a
+  //    previous load is still resolving) would otherwise let a stale
+  //    setView win the race. The old `let stale` flag only flipped on
+  //    effect unmount, so it could not protect against this.
+  //
+  // 2. `blobUrlRef` — image/video/audio media is exposed as `URL.createObjectURL`.
+  //    We revoke the previous URL before issuing a new one (and on unmount)
+  //    to keep memory bounded across many navigations.
+  const loadIdRef = useRef(0);
+  const blobUrlRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!themeReady) return;
-    let stale = false;
+
+    function revokeBlobUrl() {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    }
 
     async function loadPath() {
+      const myId = ++loadIdRef.current;
       const p = getHashPath();
+      revokeBlobUrl();
       setView({ kind: 'loading' });
 
       try {
         const st = await vfs.stat(p);
+        if (myId !== loadIdRef.current) return;
 
         if (st.isDirectory()) {
           const names = await vfs.readdir(p);
+          if (myId !== loadIdRef.current) return;
           const entries = await Promise.all(
             names.map(async (name) => {
               const childPath = p === '/' ? `/${name}` : `${p}/${name}`;
@@ -73,23 +99,52 @@ export default function App() {
               }
             }),
           );
-
-          if (!stale) setView({ kind: 'dir', path: p, entries });
-        } else {
-          const ext = fileExtension(p.split('/').pop() ?? '');
-          if (BINARY_EXTS.has(ext)) {
-            if (!stale) setView({ kind: 'file', path: p, media: { type: 'binary', size: st.size } });
-          } else {
-            const raw = (await vfs.readFile(p, 'utf8')) as unknown as string;
-            // Task 2 split: route .md / .markdown into the markdown branch
-            // so Task 4 can render with MarkdownRenderer. Other text files
-            // (source code, .txt, .json, etc.) stay as plain text.
-            const type = MARKDOWN_EXTS.has(ext) ? 'markdown' : 'text';
-            if (!stale) setView({ kind: 'file', path: p, media: { type, content: raw, size: st.size } });
-          }
+          if (myId !== loadIdRef.current) return;
+          setView({ kind: 'dir', path: p, entries });
+          return;
         }
+
+        // File branch. One blanket size guard for every type — a 50 MB
+        // markdown file is just as painful to render as a 50 MB image,
+        // and the placeholder still lets the user fall back to Download.
+        if (st.size > MAX_PREVIEW_BYTES) {
+          setView({ kind: 'file', path: p, media: { type: 'tooLarge', size: st.size } });
+          return;
+        }
+
+        const name = p.split('/').pop() ?? '';
+        const ext = fileExtension(name);
+        const klass = classifyFile(name);
+        let media: FileMedia;
+
+        if (klass === 'text' || klass === 'markdown') {
+          const raw = (await vfs.readFile(p, 'utf8')) as unknown as string;
+          if (myId !== loadIdRef.current) return;
+          media = { type: klass, content: raw, size: st.size };
+        } else if (klass === 'image' || klass === 'video' || klass === 'audio') {
+          const data = (await vfs.readFile(p)) as unknown as Uint8Array;
+          if (myId !== loadIdRef.current) return;
+          const mime = mimeFor(ext);
+          // `as BlobPart` for the same reason as the download path: the TS
+          // DOM lib types Uint8Array<ArrayBufferLike> which BlobPart's
+          // ArrayBufferView constraint won't accept directly, but the vfs
+          // always hands us a plain ArrayBuffer-backed view.
+          const url = URL.createObjectURL(new Blob([data as BlobPart], { type: mime }));
+          blobUrlRef.current = url;
+          media = { type: klass, mime, size: st.size, url };
+        } else if (klass === 'binary') {
+          // No read — just surface size. Download still works independently.
+          media = { type: 'binary', size: st.size };
+        } else {
+          // Exhaustiveness guard — matches FileView's pattern. If
+          // classifyFile's return union ever grows, TS will flag this.
+          const _exhaustive: never = klass;
+          throw new Error(`unreachable file class: ${_exhaustive}`);
+        }
+
+        setView({ kind: 'file', path: p, media });
       } catch (err: any) {
-        if (stale) return;
+        if (myId !== loadIdRef.current) return;
         const message =
           err?.code === 'ENOENT'
             ? t('vfs.pathNotFound', [p])
@@ -101,7 +156,10 @@ export default function App() {
     loadPath();
     window.addEventListener('hashchange', loadPath);
     return () => {
-      stale = true;
+      // Invalidate any in-flight load and revoke the last blob URL so we
+      // don't leak object URLs across remounts.
+      loadIdRef.current++;
+      revokeBlobUrl();
       window.removeEventListener('hashchange', loadPath);
     };
   }, [themeReady]);
