@@ -70,6 +70,12 @@ export function normalizePath(p: string): string {
   return '/' + resolved.join('/');
 }
 
+/** Encode each `/`-separated segment with `encodeURIComponent` so `/` stays as
+ *  a separator. Useful for embedding a relative VFS path in a URL fragment. */
+export function encodeRelPath(rel: string): string {
+  return rel.split('/').map(encodeURIComponent).join('/');
+}
+
 /** Return the parent directory of a file path. */
 function parentDir(filePath: string): string {
   const idx = filePath.lastIndexOf('/');

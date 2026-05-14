@@ -3,9 +3,10 @@ import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { Blocks, Download, FolderDown, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  FileWorkspace, encodeRelPath,
+  FileWorkspace,
   type FileWorkspaceAction, type FileWorkspaceHandle,
 } from './FileWorkspace';
+import { encodeRelPath } from '@/lib/vfs';
 import { CEBIAN_SKILLS_DIR } from '@/lib/constants';
 import { settingsFilePanelWidth } from '@/lib/storage';
 import { createSkillTemplate } from '@/lib/ai-config/skill-creator';

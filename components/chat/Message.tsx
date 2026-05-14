@@ -2,7 +2,7 @@ import { Bot, ChevronRight, Lightbulb, CircleHelp, CheckCircle, Send, Crosshair,
 import { useState, useEffect, useRef, useMemo, type ReactNode, type KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
+import { MarkdownRenderer } from '@/components/common/MarkdownRenderer';
 import { MessageMetaRow, type MessageMetaProps } from '@/components/chat/MessageMetaRow';
 import { extractUserText, extractUserAttachments } from '@/lib/message-helpers';
 import { showDialog } from '@/lib/dialog';

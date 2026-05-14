@@ -7,7 +7,7 @@ import { showDialog } from '@/lib/dialog';
 import { CopyButton } from './CopyButton';
 import { t } from '@/lib/i18n';
 import { CEBIAN_SKILLS_DIR, CEBIAN_PROMPTS_DIR } from '@/lib/constants';
-import { encodeRelPath } from '@/components/settings/sections/FileWorkspace';
+import { encodeRelPath } from '@/lib/vfs';
 
 /**
  * Minimal structural types for the hast (HTML AST) nodes react-markdown passes

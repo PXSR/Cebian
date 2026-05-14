@@ -31,11 +31,6 @@ import { t } from '@/lib/i18n';
 const MIN_PANEL_WIDTH = 180;
 const MAX_PANEL_WIDTH = 480;
 
-/** Encode each `/`-separated segment with encodeURIComponent so `/` stays as a separator. */
-export function encodeRelPath(rel: string): string {
-  return rel.split('/').map(encodeURIComponent).join('/');
-}
-
 /** A custom toolbar / context-menu action contributed by a section. */
 export interface FileWorkspaceAction {
   /** Unique id (used as React key). */

@@ -1,4 +1,4 @@
-import { CopyButton } from '@/components/chat/CopyButton';
+import { CopyButton } from '@/components/common/CopyButton';
 import { t } from '@/lib/i18n';
 import { fileExtension, formatSize, pickFileIcon } from '../lib/path-utils';
 

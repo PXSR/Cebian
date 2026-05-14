@@ -1,4 +1,4 @@
-import { CopyButton } from './CopyButton';
+import { CopyButton } from '@/components/common/CopyButton';
 import { t } from '@/lib/i18n';
 
 export interface MessageMetaProps {
