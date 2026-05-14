@@ -28,6 +28,8 @@ common:
   copy: "Copy"
   copied: "Copied"
   copyFailed: "Copy failed"
+  download: "Download"
+  downloadFailed: "Download failed"
   newFile: "New file"
   newFolder: "New folder"
   search: "Search"
@@ -424,6 +426,7 @@ dialogs:
 # ─── VFS browser entrypoint ───
 vfs:
   backToRoot: "Back to root"
+  zipping: "Zipping…"
   # $1 = line count
   lines: "$1 ln"
   # $1 = formatted file size

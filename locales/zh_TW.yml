@@ -27,6 +27,8 @@ common:
   copy: "複製"
   copied: "已複製"
   copyFailed: "複製失敗"
+  download: "下載"
+  downloadFailed: "下載失敗"
   newFile: "新增檔案"
   newFolder: "新增資料夾"
   search: "搜尋"
@@ -420,6 +422,7 @@ dialogs:
 # ─── VFS 瀏覽入口 ───
 vfs:
   backToRoot: "回到根目錄"
+  zipping: "打包中…"
   # $1 = 行數
   lines: "$1 行"
   # $1 = 格式化後的檔案大小
