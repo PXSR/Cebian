@@ -2,6 +2,7 @@ import { Type, type Static } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_FS_SAVE_URL } from '@/lib/types';
 import { vfs } from '@/lib/vfs';
+import { extensionForMime } from '@/lib/mime';
 import { formatSize, invalidateSkillIndexIfNeeded } from './fs-helpers';
 
 /** RequestInit subset we accept from the agent. Only fields that make sense
@@ -68,9 +69,10 @@ const FsSaveUrlParameters = Type.Object({
   }),
   dest: Type.String({
     description:
-      'VFS path to save to. Currently must be a full file path (e.g. ' +
-      '"/tmp/cat.jpg"). Directory dest with trailing "/" for automatic ' +
-      'filename derivation is not yet implemented.',
+      'VFS path to save to. Pass a full file path (e.g. "/tmp/cat.jpg") to use ' +
+      'it verbatim, OR a directory path ending with "/" (e.g. "/tmp/") to let ' +
+      'the tool derive the filename from the response Content-Disposition ' +
+      'header, the URL\'s last segment, or the MIME type — in that order.',
   }),
   init: Type.Optional(FsSaveUrlInit),
   save: Type.Optional(FsSaveUrlSave),
@@ -99,20 +101,14 @@ export const fsSaveUrlTool: AgentTool<typeof FsSaveUrlParameters> = {
       if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
         return errorResult(`Unsupported URL scheme "${parsedUrl.protocol}". Only http(s) is allowed.`);
       }
-      if (params.dest.endsWith('/')) {
-        // Directory dest (filename derivation) lands in T3 — fail loud for
-        // now so an LLM doesn't silently get a file written to the wrong
-        // path when it expects filename derivation behavior.
-        return errorResult('Directory dest (trailing "/") is not yet supported. Pass a full file path.');
-      }
 
       const overwrite = params.save?.overwrite ?? true;
-      // TODO(T3): once directory `dest` is supported, move the overwrite
-      // existence check to AFTER filename derivation — checking the raw
-      // `dest` is meaningless when `dest` is a directory (vfs.exists on a
-      // dir is always true and means something different from "file
-      // already exists at the final path").
-      if (!overwrite && (await vfs.exists(params.dest))) {
+      // For a plain file dest (no trailing slash) we can short-circuit the
+      // overwrite check before doing any network I/O. Directory dest needs
+      // the response headers to derive a filename, so its overwrite check
+      // is performed AFTER the fetch (see below).
+      const destIsDirectory = params.dest.endsWith('/');
+      if (!destIsDirectory && !overwrite && (await vfs.exists(params.dest))) {
         return errorResult(`File already exists at ${params.dest}; pass save.overwrite=true to replace it.`);
       }
 
@@ -159,17 +155,30 @@ export const fsSaveUrlTool: AgentTool<typeof FsSaveUrlParameters> = {
       const bytes = buf.byteLength;
       const mime = (response.headers.get('content-type') ?? 'application/octet-stream').split(';')[0]!.trim();
 
+      // ── Resolve final dest path ──
+      // For directory dest we now have the headers needed to derive a
+      // filename. The overwrite check moves here so it runs against the
+      // actual file path we're about to write to.
+      let finalDest = params.dest;
+      if (destIsDirectory) {
+        const filename = deriveFilename(parsedUrl, response.headers.get('content-disposition'), mime);
+        finalDest = params.dest + filename;
+        if (!overwrite && (await vfs.exists(finalDest))) {
+          return errorResult(`File already exists at ${finalDest}; pass save.overwrite=true to replace it.`);
+        }
+      }
+
       // ── Write ──
       // `vfs.writeFile` accepts Uint8Array directly and auto-creates parent
       // dirs. Mirror the other fs-* tools by invalidating the skill index
       // if the write landed under the skills directory.
-      await vfs.writeFile(params.dest, new Uint8Array(buf));
-      invalidateSkillIndexIfNeeded(params.dest);
+      await vfs.writeFile(finalDest, new Uint8Array(buf));
+      invalidateSkillIndexIfNeeded(finalDest);
 
       return {
         content: [{
           type: 'text',
-          text: `Saved ${params.dest} (${formatSize(bytes)}, ${mime}) from ${parsedUrl.href}`,
+          text: `Saved ${finalDest} (${formatSize(bytes)}, ${mime}) from ${parsedUrl.href}`,
         }],
         details: { status: 'done' },
       };
@@ -207,4 +216,86 @@ function errorResult(message: string, status?: number): AgentToolResult<{ status
     content: [{ type: 'text', text }],
     details: { status: 'error' },
   };
+}
+
+/** Derive a filename for a directory-style `dest`. Tries in order:
+ *  1. RFC 6266 / RFC 5987 `Content-Disposition` `filename*=` then `filename=`
+ *  2. The URL pathname's last segment, but only if it has a `.` (so we
+ *     don't end up with `download` from a path like `/api/download`)
+ *  3. `Untitled-<timestamp>.<ext from MIME>` as the final fallback
+ *
+ *  Output is always sanitized so path separators and `..` can't escape the
+ *  caller's `dest` directory. */
+function deriveFilename(
+  url: URL,
+  contentDisposition: string | null,
+  mime: string,
+): string {
+  // 1. Content-Disposition — server knows best when present.
+  const fromCd = parseContentDispositionFilename(contentDisposition);
+  if (fromCd) {
+    const safe = sanitizeFilename(fromCd);
+    if (safe) return safe;
+  }
+
+  // 2. URL last path segment, only if it carries an extension.
+  try {
+    const segments = url.pathname.split('/').filter(Boolean);
+    const last = segments[segments.length - 1];
+    if (last) {
+      const decoded = decodeURIComponent(last);
+      if (decoded.includes('.')) {
+        const safe = sanitizeFilename(decoded);
+        if (safe) return safe;
+      }
+    }
+  } catch {
+    // decodeURIComponent can throw on malformed input — just fall through.
+  }
+
+  // 3. Fallback. Timestamp keeps successive saves to the same dir distinct.
+  return `Untitled-${Date.now()}.${extensionForMime(mime)}`;
+}
+
+/** Pull the filename out of a `Content-Disposition` header. RFC 6266 says
+ *  the RFC 5987-encoded `filename*` parameter wins over the legacy ASCII
+ *  `filename` when both are present. Both regexes anchor on a parameter
+ *  boundary (`^` or `;`) so we never match the value half of an adjacent
+ *  parameter like `xfilename=...`. */
+function parseContentDispositionFilename(header: string | null): string | null {
+  if (!header) return null;
+  // filename*=<charset>'<lang>'<percent-encoded>  (RFC 5987)
+  const star = header.match(/(?:^|;)\s*filename\*\s*=\s*([^']*)'[^']*'([^;]+)/i);
+  if (star) {
+    const charset = (star[1] ?? '').toUpperCase();
+    // RFC 5987 forbids quoting the ext-value, but tolerate non-conforming
+    // servers that wrap it in quotes anyway.
+    const encoded = (star[2] ?? '').trim().replace(/^"|"$/g, '');
+    if (charset === '' || charset === 'UTF-8' || charset === 'US-ASCII') {
+      try { return decodeURIComponent(encoded); } catch { /* malformed, fall through */ }
+    }
+  }
+  // filename="..." or filename=...
+  const plain = header.match(/(?:^|;)\s*filename\s*=\s*("([^"]*)"|([^;]+))/i);
+  if (plain) {
+    return (plain[2] ?? plain[3] ?? '').trim() || null;
+  }
+  return null;
+}
+
+/** Sanitize a filename string so it cannot escape its parent directory.
+ *  Strips path separators, null bytes, and leading dots (so `.htaccess`
+ *  becomes `htaccess` — acceptable trade-off; the rule also kills the `.`
+ *  / `..` special cases); collapses `..` sequences; caps length so a
+ *  pathological multi-KB filename from a misbehaving server can't poison
+ *  the VFS file tree. Returns empty string if nothing usable remains. */
+function sanitizeFilename(name: string): string {
+  const cleaned = name
+    .replace(/[/\\\0]/g, '_')
+    .replace(/\.\.+/g, '_')
+    .replace(/^\.+/, '')
+    .trim();
+  // 255 chars is the typical filesystem limit; IndexedDB doesn't enforce
+  // it but downstream UI (breadcrumbs, file tree) renders poorly past it.
+  return cleaned.slice(0, 255);
 }

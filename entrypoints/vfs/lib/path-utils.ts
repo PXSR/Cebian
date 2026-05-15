@@ -27,36 +27,6 @@ export const MARKDOWN_EXTS = new Set(['md', 'markdown']);
  *  trees while keeping browser memory bounded. */
 export const MAX_PREVIEW_BYTES = 50 * 1024 * 1024;
 
-const MIME_MAP: Record<string, string> = {
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  svg: 'image/svg+xml',
-  bmp: 'image/bmp',
-  ico: 'image/x-icon',
-  avif: 'image/avif',
-  mp4: 'video/mp4',
-  webm: 'video/webm',
-  ogv: 'video/ogg',
-  mov: 'video/quicktime',
-  mkv: 'video/x-matroska',
-  mp3: 'audio/mpeg',
-  wav: 'audio/wav',
-  ogg: 'audio/ogg',
-  flac: 'audio/flac',
-  m4a: 'audio/mp4',
-  aac: 'audio/aac',
-};
-
-/** Map a file extension to a MIME type for use with `Blob` / `<img>` /
- *  `<video>` / `<audio>` sources. Unknown extensions fall back to a
- *  generic octet-stream which still works for download URLs. */
-export function mimeFor(ext: string): string {
-  return MIME_MAP[ext] ?? 'application/octet-stream';
-}
-
 /** Classify a file purely by its extension. Order matters: the more
  *  specific media buckets (markdown / image / video / audio) win before
  *  the generic binary fallback, since BINARY_EXTS still overlaps with
