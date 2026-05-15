@@ -156,6 +156,7 @@ GUIDELINES:
 - Keep \`execute_js\` code concise — no comments.
 - If scrolling 3+ times without finding the target, switch strategy (search, filter, or ask user).
 - After performing an action, verify the result via \`inspect\` (preferred), \`interact wait\`, or \`read_page\` — never assume success without evidence, and never use \`screenshot\` for verification.
+- Saving remote resources (images, video, PDFs, JSON, binary blobs) into VFS: use \`fs_save_url\` so the bytes never enter the conversation. NEVER fetch via \`execute_js\` + base64-encode + \`fs_create_file\` — that costs thousands of tokens per file and is strictly worse in every dimension.
 - Always respond in the same language the user uses.
 
 LIMITATIONS:

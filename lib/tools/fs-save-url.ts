@@ -2,7 +2,7 @@ import { Type, type Static } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_FS_SAVE_URL } from '@/lib/types';
 import { vfs } from '@/lib/vfs';
-import { extensionForMime } from '@/lib/mime';
+import { extensionForMime, isTextualMime } from '@/lib/mime';
 import { formatSize, invalidateSkillIndexIfNeeded } from './fs-helpers';
 
 /** Default ceiling on response body bytes if the caller doesn't override
@@ -14,6 +14,11 @@ const DEFAULT_MAX_BYTES = 50 * 1024 * 1024;
  *  an over-eager agent from instructing the tool to buffer multi-GB
  *  responses that would crash the service worker. */
 const HARD_MAX_BYTES = 1024 * 1024 * 1024;
+/** Number of bytes returned as a textual preview when `save.sample` is on
+ *  and the MIME is textual. Tuned to surface enough JSON / HTML / source
+ *  for the agent to recognize the payload shape without bloating tool
+ *  output token cost. */
+const SAMPLE_BYTES = 1024;
 
 /** RequestInit subset we accept from the agent. Only fields that make sense
  *  for a from-the-LLM call are exposed. Notably, `body` is restricted to
@@ -69,9 +74,11 @@ const FsSaveUrlSave = Type.Object({
   })),
   sample: Type.Optional(Type.Boolean({
     description:
-      '[NOT YET IMPLEMENTED] Include the first 1 KB of the saved content as `textSample` in the return ' +
-      'value, but only for textual MIME types (text/*, application/json, etc.). ' +
-      'Defaults to true. Binary MIME types never sample.',
+      `Include the first ${SAMPLE_BYTES / 1024} KB of the saved content as a Preview block in the ` +
+      'return text, but only for textual MIME types (text/*, application/json, ' +
+      'application/xml, application/javascript, *+json, *+xml, etc.). ' +
+      'Defaults to true. Binary MIME types never sample. Useful when the agent ' +
+      'wants to peek at a fetched JSON/HTML without a follow-up fs_read_file call.',
   })),
 }, { description: 'Optional save-behavior knobs.' });
 
@@ -236,11 +243,21 @@ export const fsSaveUrlTool: AgentTool<typeof FsSaveUrlParameters> = {
         await vfs.writeFile(finalDest, buf);
         invalidateSkillIndexIfNeeded(finalDest);
 
+        // ── Optional text sample ──
+        // For textual MIMEs we attach a short preview to the return so the
+        // agent can decide what to do with the saved file without a separate
+        // fs_read_file call. `fatal: false` lets us decode whatever happens
+        // to land in the first 1 KB even if it splits a multi-byte character.
+        let summary = `Saved ${finalDest} (${formatSize(total)}, ${mime}) from ${parsedUrl.href}`;
+        const sample = params.save?.sample ?? true;
+        if (sample && total > 0 && isTextualMime(mime)) {
+          const previewBytes = buf.subarray(0, Math.min(SAMPLE_BYTES, total));
+          const previewText = new TextDecoder('utf-8', { fatal: false }).decode(previewBytes);
+          summary += `\n\nPreview (first ${formatSize(previewBytes.byteLength)}):\n${previewText}`;
+        }
+
         return {
-          content: [{
-            type: 'text',
-            text: `Saved ${finalDest} (${formatSize(total)}, ${mime}) from ${parsedUrl.href}`,
-          }],
+          content: [{ type: 'text', text: summary }],
           details: { status: 'done' },
         };
       } finally {

@@ -83,3 +83,23 @@ function reverseMap(): Map<string, string> {
 export function extensionForMime(mime: string): string {
   return reverseMap().get(mime.toLowerCase()) ?? 'bin';
 }
+
+/** Whether a MIME type names a textual payload (decodable as UTF-8 for
+ *  preview / inline rendering). Covers the obvious `text/*` family, the
+ *  textual `application/*` whitelist, and the structured-suffix patterns
+ *  (`+json`, `+xml`, `+yaml`) so things like `application/ld+json` or
+ *  `image/svg+xml` also count. Case-insensitive. */
+export function isTextualMime(mime: string): boolean {
+  const m = mime.toLowerCase();
+  if (m.startsWith('text/')) return true;
+  if (
+    m === 'application/json'
+    || m === 'application/xml'
+    || m === 'application/javascript'
+    || m === 'application/typescript'
+    || m === 'application/x-yaml'
+    || m === 'application/x-www-form-urlencoded'
+  ) return true;
+  if (m.endsWith('+json') || m.endsWith('+xml') || m.endsWith('+yaml')) return true;
+  return false;
+}
