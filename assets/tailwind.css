@@ -2,6 +2,10 @@
 @import "tw-animate-css";
 @import "./code-highlight.css";
 
+/* @tailwindcss/typography — the `prose` utility, used by VFS markdown
+ *  preview for GitHub-style document rendering. */
+@plugin "@tailwindcss/typography";
+
 /*
  * Theme is set explicitly via `data-theme="light"` or `data-theme="dark"` on
  * the document element (see entrypoints App.tsx files). Light is the `:root`

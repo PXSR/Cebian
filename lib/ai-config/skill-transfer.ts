@@ -46,7 +46,7 @@
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { vfs, normalizePath } from '@/lib/vfs';
 import { CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE } from '@/lib/constants';
-import { parseFrontmatter } from './frontmatter';
+import { parseFrontmatter } from '@/lib/frontmatter';
 import { CHROME_API_WHITELIST } from '@/lib/tools/chrome-api-whitelist';
 import { clearSkillGrant } from './skill-grants';
 

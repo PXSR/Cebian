@@ -9,7 +9,7 @@
 import { vfs } from '@/lib/vfs';
 import { CEBIAN_PROMPTS_DIR, CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE, SKILLS_PREAMBLE } from '@/lib/constants';
 import { escapeXml } from '@/lib/utils';
-import { parseFrontmatter } from './frontmatter';
+import { parseFrontmatter } from '@/lib/frontmatter';
 
 // ─── Types ───
 

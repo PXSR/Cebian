@@ -61,6 +61,7 @@
     "typebox": "^1.1.33"
   },
   "devDependencies": {
+    "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.2.2",
     "@types/chrome": "^0.1.40",
     "@types/isomorphic-git__lightning-fs": "^4.4.8",

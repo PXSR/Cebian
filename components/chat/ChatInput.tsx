@@ -17,7 +17,7 @@ import { startElementPicker, cancelElementPicker } from '@/lib/element-picker';
 import { scanPrompts, type PromptMeta } from '@/lib/ai-config/scanner';
 import { replaceTemplateVars, gatherTemplateVars } from '@/lib/ai-config/template';
 import { vfs } from '@/lib/vfs';
-import { parseFrontmatter } from '@/lib/ai-config/frontmatter';
+import { parseFrontmatter } from '@/lib/frontmatter';
 import { CEBIAN_PROMPTS_DIR } from '@/lib/constants';
 import {
   MAX_ATTACHMENT_COUNT, MAX_IMAGE_SIZE, MAX_TEXT_FILE_SIZE,

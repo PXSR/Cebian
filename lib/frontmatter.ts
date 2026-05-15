@@ -1,8 +1,10 @@
 /**
- * YAML frontmatter parser/serializer for Prompt and Skill files.
+ * Generic YAML frontmatter parser/serializer for Markdown files.
  *
  * Uses `front-matter` for parsing (browser-compatible, no Buffer dependency).
- * Serialization uses simple string building for the flat YAML structures we use.
+ * Serialization uses simple string building for the flat YAML structures we
+ * write. Consumed by prompt/skill scanners, the VFS markdown preview, and
+ * any other place that needs to read `---` frontmatter.
  */
 import fm from 'front-matter';
 

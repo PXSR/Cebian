@@ -3,7 +3,7 @@ import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_RUN_SKILL } from '@/lib/types';
 import { CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE } from '@/lib/constants';
 import { vfs, normalizePath } from '@/lib/vfs';
-import { parseFrontmatter } from '@/lib/ai-config/frontmatter';
+import { parseFrontmatter } from '@/lib/frontmatter';
 import { getSkillGrants, setSkillGrant, permissionsMatch } from '@/lib/ai-config/skill-grants';
 import { runInSandbox } from './sandbox-rpc';
 
