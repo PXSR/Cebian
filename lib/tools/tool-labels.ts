@@ -55,6 +55,8 @@ export function getToolLabel(name: string, args: Record<string, any> = {}): stri
       return args.mode === 'content'
         ? t('tools.fs.searchContent', [truncPath(args.pattern)])
         : t('tools.fs.searchFiles', [truncPath(args.pattern)]);
+    case 'fs_save_url':
+      return t('tools.fs.saveUrl', [truncPath(args.dest)]);
     case 'run_skill':
       return t('tools.runSkill', [args.skill ?? '']);
     case 'chrome_api':

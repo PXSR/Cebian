@@ -56,6 +56,8 @@ export const TOOL_FS_READ_FILE = 'fs_read_file' as const;
 export const TOOL_FS_LIST = 'fs_list' as const;
 /** Tool that searches for files by name or content */
 export const TOOL_FS_SEARCH = 'fs_search' as const;
+/** Tool that fetches a URL and saves the response body to a VFS file */
+export const TOOL_FS_SAVE_URL = 'fs_save_url' as const;
 /** Tool that executes skill scripts with declared chrome.* permissions */
 export const TOOL_RUN_SKILL = 'run_skill' as const;
 /** Tool that calls Chrome browser APIs directly via structured parameters */

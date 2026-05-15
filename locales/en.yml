@@ -375,6 +375,8 @@ tools:
     searchFiles: "Searching files \"$1\""
     # $1 = search pattern
     searchContent: "Searching file content \"$1\""
+    # $1 = destination path
+    saveUrl: "Saving URL to $1"
   chromeApi:
     help: "Looking up Chrome API docs"
     # $1 = namespace, $2 = method

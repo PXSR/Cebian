@@ -14,6 +14,7 @@ import { fsDeleteTool } from './fs-delete';
 import { fsReadFileTool } from './fs-read-file';
 import { fsListTool } from './fs-list';
 import { fsSearchTool } from './fs-search';
+import { fsSaveUrlTool } from './fs-save-url';
 import { runSkillTool } from './run-skill';
 import { chromeApiTool } from './chrome-api-tool';
 import { SessionToolContext } from './session-context';
@@ -25,7 +26,7 @@ import { createMCPAgentTool } from './mcp-tool';
 const sharedTools: AgentTool<any>[] = [
   executeJsTool, readPageTool, interactTool, inspectTool, tabTool, screenshotTool,
   fsCreateFileTool, fsEditFileTool, fsMkdirTool, fsRenameTool, fsDeleteTool,
-  fsReadFileTool, fsListTool, fsSearchTool,
+  fsReadFileTool, fsListTool, fsSearchTool, fsSaveUrlTool,
   runSkillTool,
   chromeApiTool,
 ];

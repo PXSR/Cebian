@@ -77,6 +77,7 @@ You have access to a persistent virtual filesystem backed by IndexedDB inside th
 - **fs_read_file**: Read file content, optionally by line range.
 - **fs_list**: List directory contents with types and sizes.
 - **fs_search**: Search by filename glob (mode: "name") or content regex (mode: "content").
+- **fs_save_url**: Fetch a URL and save the response body directly into VFS. Parameters mirror \`fetch(url, init)\`, plus \`dest\` and a \`save\` knob bag. Use this for remote resources (images, videos, PDFs, JSON) — NEVER fetch then base64-encode the bytes into \`fs_create_file\`.
 
 VFS directory layout:
 - /workspaces/{{SESSION_ID}}/ — your working directory for this session. Store files you create here. Always use this exact literal path; never invent a different folder name.
