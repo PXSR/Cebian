@@ -38,6 +38,12 @@ Before writing any code, verify placement and structure:
 - Would this change require restructuring existing modules? If so, propose the restructuring plan before implementing.
 - Avoid creating unnecessary abstractions, helpers, or wrapper files for one-off operations.
 
+### Cohesion, coupling, and file size
+
+- **High cohesion** — each file/module focuses on a single concern. Don't mix UI, IO, and business rules in one file.
+- **Low coupling** — respect the established layering between `entrypoints/`, `components/`, `hooks/`, and `lib/`. Read existing imports to understand the direction; don't introduce reverse or cross-layer dependencies.
+- **File size signal** — single files growing past ~300 lines should be evaluated for splitting along a clear seam. This is a signal, not a rule — a long file with genuinely high cohesion is fine, and a short file that mixes concerns still needs splitting. Don't design for design's sake.
+
 ## Debugging & Troubleshooting
 
 - When investigating a bug, if the root cause is uncertain or multiple rounds of investigation haven't resolved it, **stop guessing** — add targeted `console.log` / `console.warn` statements at the suspicious code paths and ask the user to reproduce the issue so the logs can be collected.

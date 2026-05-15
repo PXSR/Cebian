@@ -24,7 +24,18 @@ Evaluate every changed file against ALL of the following criteria:
 1. **Best practices** — idiomatic React/TypeScript, proper hook usage (dependencies, rules of hooks), correct WXT patterns
 2. **Dead code** — no unused imports, variables, functions, or unreachable branches
 3. **Correctness** — logic is correct, edge cases handled at system boundaries
-4. **Architecture** — placement is reasonable, no misplaced concerns, clean separation of responsibilities
+4. **Architecture** — evaluate cohesion, coupling, file size, and placement:
+   - **Cohesion** — each file/module should focus on a single concern. Flag files that mix unrelated responsibilities (e.g., a UI component embedding storage IO + business rules + network calls, or a `lib/` helper that also performs DOM manipulation).
+   - **Coupling & dependency direction** — the Cebian source layers follow a strict one-way dependency chain:
+     ```
+     entrypoints/ → components/ → hooks/ → lib/
+     ```
+     Lower layers must not import from higher ones. `lib/` is the leaf layer (no React, no UI, no entrypoint internals). `hooks/` depends only on `lib/`. `components/` may use `hooks/` and `lib/`. Only `entrypoints/` orchestrates everything.
+     - **Allowed exception**: `lib/` may import *types only* from `entrypoints/*` for inter-process messaging protocols (e.g., `OffscreenRequest`/`OffscreenResponse` from `entrypoints/offscreen/main`). Value imports across this boundary are violations.
+     - **Allowed exception**: cross-entrypoint imports are fine when they're intentional UI reuse between separate HTML pages (e.g., `entrypoints/settings/App.tsx` reusing `entrypoints/sidepanel/pages/settings`).
+     - **Pre-existing known violations** — `lib/dialog.ts` (← `components/dialogs` type) and `lib/tools/ask-user-registry.tsx` (← `components/chat/Message` value). These are historical and **not the current change's problem**. Only flag them if the current change touches or extends them.
+   - **File size as a smell** — single files growing past ~300 lines, or modules exporting many unrelated symbols, are a **signal** to evaluate whether the file should be split (extract a hook, sub-component, or helper module). This is a signal, not a rule — a long file with genuinely high cohesion is acceptable, and a short file mixing concerns still needs splitting. Don't propose a split just to hit a line count; propose one only when there's a clear seam (distinct responsibility, reusable subset, or independently testable unit). Don't design for design's sake.
+   - **Placement against project layers** — new code should land in the layer matching its nature: pure logic / IO → `lib/`, React state → `hooks/`, UI → `components/`, runtime entry → `entrypoints/`. Flag misplaced code.
 5. **Error handling** — no silent failures, no swallowed exceptions
 6. **Performance** — no unnecessary re-renders, no expensive operations in hot paths, proper memoization where needed
 7. **Deprecation** — no use of deprecated APIs, functions, props, or patterns from any dependency (React, WXT, AI SDK, etc.). If a deprecated usage is found, identify the current recommended alternative
