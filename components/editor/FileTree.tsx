@@ -147,7 +147,7 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
         <input
           type="text"
           defaultValue={node.data.name}
-          className="flex-1 min-w-0 h-[22px] text-[13px] px-1 py-0 border rounded bg-background outline-none focus:ring-1 focus:ring-primary/40"
+          className="flex-1 min-w-0 h-5.5 text-[13px] px-1 py-0 border rounded bg-background outline-none focus:ring-1 focus:ring-primary/40"
           autoFocus
           onFocus={(e) => {
             editStartRef.current = Date.now();
