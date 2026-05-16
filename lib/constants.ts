@@ -186,11 +186,13 @@ export const SKILLS_PREAMBLE = `Skills are vetted, domain-specific instruction p
 
 Before acting on a user request, scan the <skill> entries below and decide:
 
-A clear match exists when ANY of the following is true:
+A clear match exists when EITHER of the following is true:
   • a token in the skill's name appears (in any language, including transliteration —
     e.g. "\u767e\u5ea6" matches "baidu", "\u641c\u7d22" matches "search") in the user's request, OR
-  • the user's request is a concrete instance of the action the description names, OR
-  • the skill's matched-url metadata covers the active tab.
+  • the user's request is a concrete instance of the action the description names.
+
+matched-url metadata, when present, only filters out skills whose glob does not
+cover the active tab — it never makes a skill match on its own.
 
 When there is a clear match, fs_read_file the skill's SKILL.md FIRST, then follow it —
 even when native tools (interact, execute_js, chrome_api, etc.) look sufficient. The

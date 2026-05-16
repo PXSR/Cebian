@@ -33,14 +33,20 @@ Keys other than the ones below are passed through to the L1 index but have no sp
 
 ### `matched-url` (string, picomatch glob)
 
-Hint that the skill is intended for a specific URL pattern. Goes into the L1 index as part of `<metadata>`. The agent is instructed to compare it against the active tab URL from `<context>` when deciding whether to activate the skill. No automatic filtering happens — it is a soft signal.
+Restricts the skill to a specific URL pattern. Goes into the L1 index as part of `<metadata>`. The agent treats `matched-url` as a one-way **filter**, not an activation signal:
+
+- When present and the active tab URL does **not** match the glob, the skill is suppressed even if its `name` / `description` otherwise would have triggered it.
+- When present and the URL matches, activation is still decided by the `name` / `description` signals — `matched-url` alone never activates a skill.
+- When absent, the skill is URL-agnostic and the `name` / `description` signals govern alone.
+
+No runtime enforcement — this is honored by the agent based on the preamble instructions, not by a hard filter in the scanner.
 
 ```yaml
 metadata:
   matched-url: "https://github.com/**"
 ```
 
-Use globs (`*`, `**`, `?`, `{a,b}`), not regex. Omit entirely if the skill is page-agnostic.
+Use globs (`*`, `**`, `?`, `{a,b}`), not regex. Omit entirely if the skill is page-agnostic. Avoid `"*"` — it matches every URL and is equivalent to omitting the field, only noisier.
 
 ### `permissions` (string array)
 

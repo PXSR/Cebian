@@ -38,10 +38,13 @@ export async function createSkillTemplate(root: string): Promise<CreatedSkill> {
 name: ${name}
 description: "TODO - describe what this skill does and when to use it."
 metadata:
-  matched-url:
-    - "*"
   author: ""
-  version: "1.0"
+  version: "0.1.0"
+  # Optional Cebian extensions — uncomment as needed:
+  # matched-url: "https://example.com/**"
+  # permissions:
+  #   - chrome.bookmarks
+  #   - page.executeJs
 ---
 
 ## Instructions
