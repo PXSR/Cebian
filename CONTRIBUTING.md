@@ -22,6 +22,15 @@ pnpm run build        # production build
 
 See [README.md](README.md) for more details.
 
+### Optional: auto-seed a dev AI provider
+
+Copy `.env.example` to `.env.local` and fill in `WXT_DEV_API_KEY` plus the
+companion fields. On the next `pnpm run dev` launch the extension will
+auto-create a custom OpenAI-compatible provider so you can skip the manual
+setup wizard on a fresh install. The seed only runs in dev mode and only
+when the API key is non-empty; production builds skip the logic entirely.
+An existing provider with the same id is never overwritten.
+
 ## Contribution Workflow
 
 1. Fork the repository and create a branch from `master`.

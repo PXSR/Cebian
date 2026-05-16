@@ -20,6 +20,13 @@ pnpm run build        # 生产构建
 
 更多说明见 [README.zh-CN.md](README.zh-CN.md)。
 
+### 可选：自动注入开发用 AI provider
+
+复制 `.env.example` 为 `.env.local`，填写 `WXT_DEV_API_KEY` 以及配套字段。
+下次 `pnpm run dev` 启动时，扩展会自动创建一个自定义 OpenAI 兼容 provider，
+省去在 UI 里手动走一遍配置流程。这段逻辑只在 dev 模式且 API key 非空时执行，
+生产构建完全跳过；如果同 id 的 provider 已存在，也不会被覆盖。
+
 ## 贡献流程
 
 1. Fork 本仓库，并从 `master` 创建你的分支。

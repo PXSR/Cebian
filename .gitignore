@@ -26,8 +26,10 @@ web-ext.config.ts
 *.sln
 *.sw?
 
-# Dev-only storage seed (contains API keys)
-entrypoints/background/dev-seed.ts
+# Local environment overrides (may contain dev API keys, etc.)
+# `.env` / `.env.example` are committed; `*.local` are personal overrides.
+.env.local
+.env.*.local
 
 # Astro site build output / cache
 site/.astro/

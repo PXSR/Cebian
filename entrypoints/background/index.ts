@@ -2,6 +2,7 @@ import { setupOAuthRefresh } from './oauth-refresh';
 import { agentManager } from './agent-manager';
 import { sessionStore } from './session-store';
 import { recorder } from './recorder';
+import { seedDevStorage } from './dev-seed';
 import { invalidateSkillIndex } from '@/lib/ai-config/scanner';
 import { getMCPManager } from '@/lib/mcp/manager';
 import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage } from '@/lib/protocol';
@@ -28,6 +29,10 @@ export default defineBackground(() => {
     .catch((error) => console.error(error));
 
   setupOAuthRefresh();
+
+  // Dev-only: seed a custom provider from .env.local if configured.
+  // No-op in production builds and when WXT_DEV_API_KEY is empty.
+  void seedDevStorage().catch(err => console.warn('[dev-seed] failed:', err));
 
   // ─── Port management ───
 

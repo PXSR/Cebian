@@ -41,11 +41,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Create dev-seed stub for CI
-        run: |
-          # Create a stub for the dev-only seed file that is gitignored
-          echo 'export function seedDevStorage(): void {}' > entrypoints/background/dev-seed.ts
-
       - name: Build extension
         run: |
           if [ "${{ matrix.browser }}" = "firefox" ]; then
