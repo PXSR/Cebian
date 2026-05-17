@@ -50,6 +50,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     pendingTools,
     send,
     cancel,
+    retry,
     subscribe: portSubscribe,
     unsubscribe: portUnsubscribe,
     resolveTool,
@@ -231,6 +232,12 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                 };
               }
 
+              // Retry button: only on the very last message in the timeline,
+              // only when the turn has actually closed (no pending tool round),
+              // and only when the agent is idle (no overlapping run).
+              const canRetry = isLast && isTurnClosing && !isAgentRunning;
+              const onRetry = canRetry ? retry : undefined;
+
               return (
                 <AgentMessage
                   key={`asst-${idx}`}
@@ -238,13 +245,14 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                   showHeader={showHeader}
                   meta={meta}
                   copyText={copyText}
+                  onRetry={onRetry}
                 >
                   {thinkingBlocks.map((block, i) => (
                     <ThinkingBlock key={`t-${idx}-${i}`} content={block.thinking} isLive={isStreaming} />
                   ))}
                   {text && <AgentTextBlock content={text} />}
                   {isError && (
-                    <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 mt-2">
+                    <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 mt-2 whitespace-pre-wrap break-all">
                       {assistantMsg.errorMessage ?? t('chat.session.modelError')}
                     </div>
                   )}

@@ -90,14 +90,18 @@ export function AgentMessage({
   showHeader = true,
   meta,
   copyText,
+  onRetry,
 }: {
   children?: ReactNode;
   isStreaming?: boolean;
   showHeader?: boolean;
   /** Meta is rendered as soon as `!isStreaming`; the copy button inside the
    * row is gated on `copyText` (skipped for pure tool-call turns). */
-  meta?: Omit<MessageMetaProps, 'text'>;
+  meta?: Omit<MessageMetaProps, 'text' | 'onRetry'>;
   copyText?: string;
+  /** When provided, a retry button is shown in the meta row. Caller decides
+   *  eligibility (last turn-closing assistant, agent idle). */
+  onRetry?: () => void;
 }) {
   return (
     <div className={`self-start w-full ${showHeader ? '' : '-mt-1'}`}>
@@ -116,8 +120,8 @@ export function AgentMessage({
           />
         )}
       </div>
-      {!isStreaming && (meta || copyText) && (
-        <MessageMetaRow {...(meta ?? {})} text={copyText} />
+      {!isStreaming && (meta || copyText || onRetry) && (
+        <MessageMetaRow {...(meta ?? {})} text={copyText} onRetry={onRetry} />
       )}
     </div>
   );

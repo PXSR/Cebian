@@ -288,6 +288,8 @@ chat:
     tokensInBreakdownHit: "未缓存 $1 · 缓存 $2"
     # 缓存明细（含写入）。$1 = 未缓存、$2 = 缓存命中、$3 = 写入缓存（均已格式化）
     tokensInBreakdownHitWrite: "未缓存 $1 · 缓存 $2 · 写缓存 $3"
+    # 最新一轮 assistant 消息左下角重试按钮的 tooltip / aria-label
+    retry: "重试"
   session:
     loading: "加载会话中…"
     modelError: "模型返回错误"

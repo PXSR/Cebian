@@ -361,6 +361,22 @@ export default defineBackground(() => {
         );
         break;
 
+      case 'retry': {
+        // Re-run the last user turn. Errors propagate via the `error`
+        // ServerMessage just like `prompt` so the sidepanel can surface
+        // "no user message found" / "agent already running" / model setup
+        // failures consistently.
+        state.subscribedSession = msg.sessionId;
+        agentManager.retry(msg.sessionId).catch((err) => {
+          port.postMessage({
+            type: 'error',
+            sessionId: msg.sessionId,
+            error: err.message ?? String(err),
+          } satisfies ServerMessage);
+        });
+        break;
+      }
+
       case 'resolve_tool':
         agentManager.resolveTool(msg.sessionId, msg.toolName, msg.response);
         break;

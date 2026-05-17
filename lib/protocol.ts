@@ -16,6 +16,12 @@ export type ClientMessage =
   | { type: 'unsubscribe' }
   | { type: 'prompt'; sessionId: string | null; text: string; attachments?: Attachment[] }
   | { type: 'cancel'; sessionId: string }
+  /** Re-run the last user turn for `sessionId`. The background drops any
+   *  trailing assistant / toolResult messages (typically a failed turn or
+   *  one the user is unhappy with) and resumes the agent loop from the most
+   *  recent user message. No-op if no user message exists, or if the agent
+   *  is currently running. */
+  | { type: 'retry'; sessionId: string }
   | { type: 'resolve_tool'; sessionId: string; toolName: string; response: any }
   | { type: 'cancel_tool'; sessionId: string; toolName: string }
   | { type: 'session_load'; sessionId: string }

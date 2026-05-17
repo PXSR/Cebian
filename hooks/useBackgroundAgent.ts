@@ -296,6 +296,26 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     if (sessionId) postMessage({ type: 'cancel', sessionId });
   }, [postMessage]);
 
+  const retry = useCallback(() => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId) return;
+    if (!portRef.current) {
+      setState(prev => ({ ...prev, lastError: '未连接到后台服务，请稍后再试' }));
+      return;
+    }
+    // Optimistically flip running + clear any prior error. This hides the
+    // retry button immediately so a double-click in the same window can't
+    // fire a second IPC. Multi-window concurrent clicks land at the BG as
+    // duplicates and are silently no-op'd there; this window's optimistic
+    // state converges to the in-flight retry's broadcasts.
+    setState(prev => ({
+      ...prev,
+      isAgentRunning: true,
+      lastError: null,
+    }));
+    postMessage({ type: 'retry', sessionId });
+  }, [postMessage]);
+
   const subscribe = useCallback((sessionId: string) => {
     sessionIdRef.current = sessionId;
     setState(prev => ({ ...prev, sessionId }));
@@ -357,6 +377,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     pendingTools,
     send,
     cancel,
+    retry,
     subscribe,
     unsubscribe,
     loadSession,

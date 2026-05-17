@@ -84,6 +84,12 @@ class AgentManager {
   private sessions = new Map<string, ManagedSession>();
   /** Guards against concurrent getOrCreateAgent calls for the same session. */
   private creating = new Map<string, Promise<ManagedSession>>();
+  /** Per-session synchronous mutex for retry(). Prevents two retry() calls
+   *  (or a retry racing against itself across a network round-trip) from
+   *  both passing the `isRunning` check and spawning orphan agents. The
+   *  flag is set BEFORE the first await so the second caller hits it
+   *  synchronously before any context switch. */
+  private retrying = new Set<string>();
   private broadcast: BroadcastFn = () => {};
   /** True iff we're currently holding a SW keep-alive token. Tracked so
    *  acquire/release stay balanced even across error paths. */
@@ -400,6 +406,135 @@ class AgentManager {
       managed.toolCtx.cancelAll();
     } else {
       await managed.agent.prompt(enriched, images.length > 0 ? images : undefined);
+    }
+  }
+
+  /**
+   * Re-run the last user turn for a session.
+   *
+   * Drops trailing assistant / toolResult messages after the most recent
+   * user message and resumes the agent loop from there. Used by the chat
+   * UI's "Retry" button — covers both genuine failures (`stopReason: 'error'`)
+   * and successful turns the user is unhappy with.
+   *
+   * No-op if no user message exists in the transcript, or if the agent is
+   * currently running for this session (the UI guards against this, but a
+   * stale port message could still race in).
+   */
+  async retry(sessionId: string): Promise<void> {
+    // Synchronous mutex BEFORE any await. Without this, two retry() calls
+    // landing in the same tick (double-click, multi-window race, stale port
+    // message, etc.) can both pass the `isRunning` check below — the first
+    // call hasn't yet had a chance to fire `agent_start` — dispose each
+    // other's agents, and leave one streaming into the void.
+    //
+    // Concurrent retry is a benign duplicate of an already-in-flight intent,
+    // not a user error: the retry IS in fact happening, just via the first
+    // caller. We silently no-op so the duplicate window doesn't see a
+    // misleading "Retry already in progress" toast. The duplicate caller's
+    // subscribed port will converge to the right state via the in-flight
+    // retry's `session_state` / `agent_start` broadcasts.
+    if (this.retrying.has(sessionId)) {
+      console.debug('[agent-manager] retry: concurrent call ignored', sessionId);
+      return;
+    }
+    this.retrying.add(sessionId);
+    try {
+      // Cold-load from DB if needed. This mirrors `prompt()` for sessions
+      // the user is viewing after a SW restart.
+      let managed = await this.getOrCreateAgent(sessionId);
+
+      // Same reasoning as the mutex: by the time we get here, another caller
+      // may already have kicked off a retry that's now running. Silent no-op
+      // — the in-flight run's broadcasts will reconcile every window's view.
+      if (managed.isRunning) {
+        console.debug('[agent-manager] retry: agent already running, ignored', sessionId);
+        return;
+      }
+
+      const messages = [...managed.agent.state.messages];
+
+      // Find the most recent user-role message. Steered user messages count
+      // too — semantically they ARE the latest user input.
+      let lastUserIdx = -1;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === 'user') {
+          lastUserIdx = i;
+          break;
+        }
+      }
+      if (lastUserIdx < 0) {
+        // This SHOULD be unreachable: the UI only shows retry on the latest
+        // assistant turn, which by definition has a preceding user message.
+        // Throwing here surfaces the bug instead of silently no-oping.
+        throw new Error('No user message found to retry');
+      }
+
+      // Truncate to the last user message inclusive — drops the failed/
+      // unwanted assistant turn AND any orphan toolResult / toolUse blocks
+      // that came after it (mid-tool-round failures, etc.).
+      const truncated = messages.slice(0, lastUserIdx + 1);
+
+      // Persist the truncation BEFORE dispose/recreate so a SW restart in
+      // the recreate window doesn't resurrect the failed message from disk.
+      // `flush` collapses the throttler's pending timer and writes
+      // immediately; this also closes the subscribe-during-recreate race
+      // (a subscriber that lands between sessions.delete and the new
+      // managed install reads truncated state from DB, not stale state).
+      if (managed.sessionCreated) {
+        sessionStore.scheduleWrite(sessionId, truncated);
+        await sessionStore.flush(sessionId);
+      }
+
+      // Defensive: cancel any pending interactive tool. The UI hides the retry
+      // button while a tool is pending, but a stale message could still arrive.
+      managed.toolCtx.cancelAll();
+
+      // Recreate the agent with the truncated transcript. pi-agent-core's
+      // `state.messages` isn't safely mutable from outside, so we dispose
+      // and rebuild — same pattern as the model-change branch in `prompt()`.
+      // The recreation also picks up the CURRENT active model, which is the
+      // desired behavior: if the user switched models after a failure (e.g.
+      // because the previous model id wasn't supported), retry uses the new
+      // one.
+      const wasCreated = managed.sessionCreated;
+      managed.unsubscribeAgent();
+      managed.unsubscribeToolCtx();
+      managed.toolCtx.dispose();
+      this.sessions.delete(sessionId);
+      this.updateKeepAlive();
+      managed = await this.getOrCreateAgent(sessionId, truncated);
+      managed.sessionCreated = wasCreated;
+
+      // Broadcast the truncated state so subscribed sidepanels drop the
+      // failed assistant bubble immediately. Without this the stale bubble
+      // would linger until the new turn streams its first chunk — and even
+      // then the client's `message_update` handler would push the new
+      // assistant alongside the old one rather than replacing it.
+      //
+      // `isRunning: true` is the truthful value here: `continue()` is
+      // invoked on the very next line and fires `agent_start` on entry,
+      // so the agent IS effectively running. Broadcasting `false` would
+      // cause a visible T(broadcast) → T(agent_start) flicker on every
+      // subscribed window — briefly re-enabling the composer and breaking
+      // the optimistic-running guarantee the hook sets up on click.
+      this.broadcast(sessionId, {
+        type: 'session_state',
+        sessionId,
+        messages: truncated,
+        isRunning: true,
+      });
+
+      // `continue()` resumes the agent loop against the current transcript.
+      // Since the last message is a user message after our truncation, it
+      // re-prompts the LLM without appending a duplicate user message.
+      await managed.agent.continue();
+    } finally {
+      // Release the mutex even on throw. By this point either `continue()`
+      // has emitted `agent_start` (so `managed.isRunning === true` blocks
+      // subsequent retries naturally) or we threw before getting that far
+      // and the next retry attempt is allowed to proceed.
+      this.retrying.delete(sessionId);
     }
   }
 
