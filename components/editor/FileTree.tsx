@@ -104,6 +104,7 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
   const editStartRef = useRef<number>(0);
 
   const handleClick = (e: React.MouseEvent) => {
+    if (node.isEditing) return; // Don't activate/toggle while inline-renaming
     if (node.isInternal) {
       node.toggle();
     }
@@ -149,6 +150,11 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
           defaultValue={node.data.name}
           className="flex-1 min-w-0 h-5.5 text-[13px] px-1 py-0 border rounded bg-background outline-none focus:ring-1 focus:ring-primary/40"
           autoFocus
+          // Prevent pointer/click from bubbling to the drag-handle div.
+          // Without this, pointerdown starts a DnD drag (can't select text)
+          // and click triggers handleClick → activate → navigates away.
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
           onFocus={(e) => {
             editStartRef.current = Date.now();
             const val = e.target.value;
@@ -415,6 +421,7 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
   };
 
   const onActivate = (node: NodeApi<TreeNodeData>) => {
+    if (node.isEditing) return; // Don't navigate while inline-renaming
     if (node.isLeaf) onSelect(node.id);
   };
 
