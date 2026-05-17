@@ -40,6 +40,8 @@
 
 // ─── Types ───────────────────────────────────────────────────────────
 
+import type { McpUiResourceCsp } from '@modelcontextprotocol/ext-apps/app-bridge';
+
 interface JsonRpcMessage {
   jsonrpc: '2.0';
   /** JSON-RPC 2.0 permits `null` on responses to malformed requests. */
@@ -50,12 +52,14 @@ interface JsonRpcMessage {
   error?: unknown;
 }
 
-interface CspMeta {
-  connectDomains?: string[];
-  resourceDomains?: string[];
-  frameDomains?: string[];
-  baseUriDomains?: string[];
-}
+/**
+ * CSP shape on `_meta.ui.csp`, imported from ext-apps so the type
+ * stays in lockstep with the spec / SDK. Type-only import — erased at
+ * compile time, so this doesn't pull the package into the sandbox-page
+ * bundle. The proxy revalidates every entry through `DOMAIN_RE`
+ * regardless, so this is consumer-side ergonomics, not a trust boundary.
+ */
+type CspMeta = McpUiResourceCsp;
 
 interface PermissionsMeta {
   camera?: object;

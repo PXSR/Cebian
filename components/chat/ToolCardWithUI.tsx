@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { AppRenderer } from '@mcp-ui/client';
 import type { McpUiResourceCsp } from '@modelcontextprotocol/ext-apps/app-bridge';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { Loader2, AlertTriangle, RotateCw } from 'lucide-react';
 import { t } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
+import { useContainerWidth } from '@/hooks/useContainerWidth';
 import { useIsDark } from '@/hooks/useIsDark';
 import { useMCPAppResource } from '@/hooks/useMCPAppResource';
 import type { MCPAppDetails } from '@/lib/tools/mcp-tool';
@@ -52,62 +54,43 @@ interface ToolCardWithUIProps {
   serverId: string;
   /** Server-attached MCP App payload from `details.mcpApp`. */
   mcpApp: MCPAppDetails;
+  /**
+   * `CallToolResult` envelope synthesised by the caller from the existing
+   * `ToolResultMessage` fields. We do NOT persist this on `MCPAppDetails`
+   * to avoid storing the same `content` blocks twice in IndexedDB; see
+   * the JSDoc on `MCPAppDetails`. The iframe needs the SDK's exact wire
+   * shape (per SEP-1865 "Data Passing"), so the caller assembles it once
+   * at the render boundary.
+   */
+  toolResult: CallToolResult;
 }
 
-export function ToolCardWithUI({ label, toolName, serverId, mcpApp }: ToolCardWithUIProps) {
+export function ToolCardWithUI({ label, toolName, serverId, mcpApp, toolResult }: ToolCardWithUIProps) {
   const isDark = useIsDark();
   const { status, resource, errorCode, errorMessage, retry } = useMCPAppResource(
     serverId,
     mcpApp.resourceUri,
   );
 
-  // Track the body container's actual rendered width with a ResizeObserver
-  // so we can hand it to the View via `hostContext.containerDimensions`.
+  // Measure the body container's actual rendered width so we can hand
+  // it to the View via `hostContext.containerDimensions`. Without this,
+  // mcp-ui's AppRenderer falls back to the View's self-reported
+  // "natural size" (per `ui/notifications/size-changed`) — for draw.io
+  // that's ~320px, leaving the rest of the chat-message bubble visibly
+  // empty next to the diagram. Telling the View "you have N pixels,
+  // use them" makes it re-layout to fill.
   //
-  // Without this, mcp-ui's AppRenderer falls back to the View's
-  // self-reported "natural size" (per `ui/notifications/size-changed`).
-  // For draw.io that natural size is ~320px, which leaves the rest of the
-  // chat-message bubble visibly empty next to the diagram. Telling the
-  // View "you have N pixels, use them" makes it re-layout to fill.
+  // We pass FIXED `width` (not `maxWidth`) so the View sets its root
+  // to 100vw inside the iframe — see SEP-1865 "Container Dimensions".
+  // Height stays flexible with a hard ceiling so a huge diagram doesn't
+  // eat the whole chat scroll area.
   //
-  // We pass FIXED `width` (not `maxWidth`) so the View sets its root to
-  // 100vw inside the iframe — see SEP-1865 "Container Dimensions". Height
-  // stays flexible with a hard ceiling so a huge diagram doesn't eat the
-  // whole chat scroll area.
+  // `coalesce: 'raf'` is the critical bit: a continuous sidepanel-drag
+  // fires the observer per integer pixel, which would otherwise produce
+  // hundreds of setState → re-render → `host-context-changed`
+  // postMessage → diagram-relayout cycles in a single drag.
   const bodyRef = useRef<HTMLDivElement>(null);
-  const [bodyWidth, setBodyWidth] = useState<number | null>(null);
-  useEffect(() => {
-    const el = bodyRef.current;
-    if (!el) return;
-    // Coalesce ResizeObserver callbacks to one per animation frame. A
-    // continuous sidepanel-drag fires the observer per integer pixel,
-    // which would otherwise produce hundreds of setState → re-render →
-    // `host-context-changed` postMessage → diagram-relayout cycles in a
-    // single drag. One per frame is what mcp-ui / the View can actually
-    // consume; further debouncing trades responsiveness for nothing.
-    let rafId: number | null = null;
-    let pendingWidth = 0;
-    const ro = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      // Math.floor: ignore sub-pixel jitter; integer-pixel changes are
-      // still picked up.
-      pendingWidth = Math.floor(entry.contentRect.width);
-      if (rafId !== null) return;
-      rafId = requestAnimationFrame(() => {
-        rafId = null;
-        setBodyWidth(pendingWidth);
-      });
-    });
-    ro.observe(el);
-    return () => {
-      ro.disconnect();
-      if (rafId !== null) cancelAnimationFrame(rafId);
-    };
-    // The body div is unconditionally rendered across all statuses (the
-    // children swap, the container doesn't), so the observer is attached
-    // exactly once on mount and cleaned up on unmount.
-  }, []);
+  const bodyWidth = useContainerWidth(bodyRef, { coalesce: 'raf' });
 
   // The sandbox proxy URL is the MV3 sandbox page WXT generates from
   // `entrypoints/mcp-app.sandbox/`. AppRenderer creates an `<iframe
@@ -217,8 +200,8 @@ export function ToolCardWithUI({ label, toolName, serverId, mcpApp }: ToolCardWi
             <div className="text-xs text-destructive">
               {errorCode === 'server_unavailable'
                 ? t('chat.mcpApp.errorServerUnavailable')
-                : errorCode === 'fetch_failed'
-                  ? t('chat.mcpApp.errorFetchFailed', [errorMessage ?? ''])
+                : errorCode === 'fetch_failed' && errorMessage
+                  ? t('chat.mcpApp.errorFetchFailed', [errorMessage])
                   : t('chat.mcpApp.errorGeneric')}
             </div>
             {canRetry && (
@@ -237,7 +220,7 @@ export function ToolCardWithUI({ label, toolName, serverId, mcpApp }: ToolCardWi
             html={resource.text ?? ''}
             toolResourceUri={mcpApp.resourceUri}
             toolInput={mcpApp.toolInput}
-            toolResult={mcpApp.toolResult}
+            toolResult={toolResult}
             hostContext={hostContext}
             onOpenLink={handleOpenLink}
             // v1 TODO: AppRenderer surfaces protocol-level errors here

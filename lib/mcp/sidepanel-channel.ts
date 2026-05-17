@@ -41,6 +41,18 @@ type Pending = {
 };
 
 const pending = new Map<string, Pending>();
+/**
+ * (serverId, resourceUri) → in-flight or resolved fetch promise.
+ *
+ * v1 doesn't bound this map. Entries evict only on rejection (inside
+ * `fetch`'s catch path) or sidepanel page reload. A long-running
+ * sidepanel that opens many distinct sessions accumulates entries —
+ * each is one `MCPResourceContents` (~350 KB for draw.io). In practice
+ * users hit a small N of unique `(server, uri)` pairs per session and
+ * reload often enough that this isn't a real leak today. Add an LRU
+ * if a future MCP App workflow produces >50 unique resources without
+ * a page reload.
+ */
 const cache = new Map<string, Promise<MCPResourceContents>>();
 let portRef: chrome.runtime.Port | null = null;
 

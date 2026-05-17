@@ -19,6 +19,7 @@ import { ToolCard } from '@/components/chat/ToolCard';
 import { ToolCardWithUI } from '@/components/chat/ToolCardWithUI';
 import { isMcpAppResult } from '@/lib/tools/mcp-tool';
 import type { AssistantMessage, ToolResultMessage, UserMessage } from '@mariozechner/pi-ai';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {
   getAssistantText,
   getThinkingBlocks,
@@ -296,13 +297,32 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                     // an off-spec server's bogus payload reach the iframe
                     // and produce a vague fetch failure downstream.
                     if (toolResult?.details && isMcpAppResult(toolResult.details)) {
+                      // Synthesise the SDK's `CallToolResult` wire shape
+                      // from the existing message fields — we deliberately
+                      // don't persist a second copy on `details.mcpApp`,
+                      // see JSDoc on `MCPAppDetails` for the storage
+                      // motivation.
+                      const synthesizedToolResult: CallToolResult = {
+                        content: toolResult.content as CallToolResult['content'],
+                        ...(toolResult.details.structured !== undefined
+                          ? { structuredContent: toolResult.details.structured as Record<string, unknown> }
+                          : {}),
+                        isError: toolResult.isError,
+                      };
                       return (
                         <ToolCardWithUI
                           key={`tool-${tc.id}`}
                           label={getToolLabel(tc.name, tc.arguments)}
-                          toolName={tc.name}
+                          // Real MCP tool name (e.g. `create_diagram`), not
+                          // the agent-runtime slug `mcp__drawio__create_diagram`.
+                          // The slug is sanitized for provider name limits;
+                          // the View receives this via `ui/notifications/tool-*`
+                          // and SEP-1865 expects the real name so apps that
+                          // dispatch on `tool` recognise it.
+                          toolName={toolResult.details.tool}
                           serverId={toolResult.details.server.id}
                           mcpApp={toolResult.details.mcpApp}
+                          toolResult={synthesizedToolResult}
                         />
                       );
                     }

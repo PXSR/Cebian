@@ -1,6 +1,5 @@
 import type { TSchema } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { MCPServerConfig } from '@/lib/storage';
 import type { MCPTool } from '@/lib/mcp/client';
 import { getMCPManager, ThrottleError } from '@/lib/mcp/manager';
@@ -17,24 +16,22 @@ import { getMCPManager, ThrottleError } from '@/lib/mcp/manager';
  *      comes from the sibling `details.server` already on every MCP
  *      tool result — we deliberately don't duplicate it here.
  *   2. Push `toolInput` to the iframe via `ui/notifications/tool-input`.
- *   3. Push `toolResult` to the iframe via `ui/notifications/tool-result`.
+ *   3. Push the `CallToolResult` to the iframe via
+ *      `ui/notifications/tool-result`. We do NOT persist a second copy of
+ *      the result envelope here — the agent runtime already stores the
+ *      `content` blocks on the sibling `ToolResultMessage` (and
+ *      `structuredContent` on `details.structured`), so the consumer
+ *      synthesises the `CallToolResult` from those fields at render time.
+ *      Avoids triplicating the same payload in IndexedDB.
  *
- * Stored alongside the message in IndexedDB so re-opening an old chat can
- * re-render the iframe (the HTML itself is re-fetched, not persisted).
- *
- * `toolResult` is typed as the SDK's `CallToolResult` (the wire shape the
- * iframe receives via `ui/notifications/tool-result`) so consumers feed
- * `<AppRenderer>` without a cast. Our project-local `MCPToolResult` is
- * structurally a subset of it; the boundary narrowing happens once here,
- * inside `execute()`.
+ * Stored alongside the message so re-opening an old chat can re-render
+ * the iframe (the HTML itself is re-fetched, not persisted).
  */
 export interface MCPAppDetails {
   /** UI resource URI from `_meta.ui.resourceUri`. Always `ui://...` in practice. */
   resourceUri: string;
   /** Verbatim tool call arguments — pushed to the iframe on init. */
   toolInput: Record<string, unknown>;
-  /** Full `CallToolResult` envelope — pushed to the iframe after init. */
-  toolResult: CallToolResult;
 }
 
 /**
@@ -50,14 +47,21 @@ export interface MCPAppDetails {
  */
 export function isMcpAppResult(details: unknown): details is {
   server: { id: string; name: string };
+  tool: string;
+  /** Optional `structuredContent` set by `createMCPAgentTool`. The guard
+   *  doesn't verify its shape (it's `unknown` per MCP spec); declared
+   *  here so consumers synthesising a `CallToolResult` can read it
+   *  without an extra cast. */
+  structured?: unknown;
   mcpApp: MCPAppDetails;
 } {
   if (!details || typeof details !== 'object') return false;
-  const d = details as { server?: unknown; mcpApp?: unknown };
+  const d = details as { server?: unknown; tool?: unknown; mcpApp?: unknown };
   const server = d.server as { id?: unknown } | undefined;
   const mcpApp = d.mcpApp as { resourceUri?: unknown } | undefined;
   return (
     typeof server?.id === 'string' && server.id.length > 0 &&
+    typeof d.tool === 'string' && d.tool.length > 0 &&
     typeof mcpApp?.resourceUri === 'string' && mcpApp.resourceUri.length > 0
   );
 }
@@ -138,16 +142,7 @@ export function createMCPAgentTool(
         }
         const toolInput = (params as Record<string, unknown>) ?? {};
         const mcpApp: MCPAppDetails | undefined = uiResourceUri
-          ? {
-              resourceUri: uiResourceUri,
-              toolInput,
-              // Project-local `MCPToolResult` is a structural subset of
-              // the SDK's `CallToolResult` (same fields, slightly looser
-              // `content` element typing). The cast is safe at this
-              // origin boundary; consumers (e.g. `ToolCardWithUI`) read
-              // a strongly typed `CallToolResult` without a cast.
-              toolResult: result as CallToolResult,
-            }
+          ? { resourceUri: uiResourceUri, toolInput }
           : undefined;
         return {
           content: convertContent(result.content),

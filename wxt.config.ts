@@ -44,11 +44,22 @@ export default defineConfig({
     // iframe's meta CSP, where `DOMAIN_RE` enforces a strict allowlist
     // against server-declared domains.
     //
-    // For the skill executor specifically: this override is a strict-or-
-    // neutral change vs the Chrome default. `'unsafe-eval'` is preserved
-    // (skills depend on it); `connect-src` / `img-src` / etc. were
-    // implicitly unrestricted in the default and are now bounded to
-    // `https:`/`data:`/`blob:` — a tightening, not a loosening.
+    // ⚠ Cross-entry effect: manifest's `content_security_policy.sandbox`
+    // applies to ALL sandbox pages, not just `mcp-app.html`. Compared to
+    // Chrome's default (`script-src 'self' 'unsafe-inline' 'unsafe-eval';
+    // child-src 'self'`, with `default-src` implicitly `'none'` for the
+    // rest), this override:
+    //   - WIDENS `script-src` with `https: data: blob:` — a skill in the
+    //     existing executor can now load remote scripts. Accepted because
+    //     skills are user-installed code with an existing trust model
+    //     (and `'unsafe-eval'` already let them execute arbitrary code).
+    //   - WIDENS `connect-src` / `img-src` / `media-src` / etc. from the
+    //     `default-src 'none'` baseline to allow `https:` / `data:` /
+    //     `blob:`. Same trust rationale.
+    //   - TIGHTENS nothing — there's no directive this override narrows.
+    //
+    // Splitting per-entry would require WXT-level support that doesn't
+    // exist; accept the shared widening as a one-time trust trade-off.
     content_security_policy: {
       sandbox:
         "sandbox allow-scripts allow-forms allow-popups allow-modals; " +
