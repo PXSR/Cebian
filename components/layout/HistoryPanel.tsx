@@ -119,7 +119,7 @@ export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }
       </div>
 
       {/* Body */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="px-5 py-3 space-y-1">
           {loading && (
             <div className="text-center text-sm text-muted-foreground py-12">
