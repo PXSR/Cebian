@@ -304,6 +304,13 @@ chat:
   session:
     loading: "加载会话中…"
     modelError: "模型返回错误"
+    # 用户中途点停后，在 assistant 气泡里显示的提示。
+    # 保持中性语气——不是错误，只是没跑完。
+    cancelled: "已取消"
+    # 后台端口还没连上时（通常发生在 SW 刚唤醒 / 断开重连期间）点发送/重试会看到这条
+    notConnected: "未连接到后台服务，请稍后再试"
+    # 自动重连多次失败后提示。语气是「还在试」，不保证能连上
+    reconnecting: "连接断开，正在重试…"
     welcomeReady: "有什么我可以帮你的？"
     scrollToBottom: "跳至最新消息"
 

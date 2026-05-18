@@ -6,6 +6,8 @@ import type { AgentMessage } from '@mariozechner/pi-agent-core';
 import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage, type SessionMeta } from '@/lib/protocol';
 import type { SessionRecord } from '@/lib/db';
 import type { Attachment } from '@/lib/attachments';
+import { truncateForRetry } from '@/lib/message-helpers';
+import { t } from '@/lib/i18n';
 import { recorderChannel } from '@/lib/recorder/sidepanel-channel';
 import { mcpAppResourceChannel } from '@/lib/mcp/sidepanel-channel';
 import { myInstanceId } from '@/lib/instance-id';
@@ -199,7 +201,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
       if (retryCount === 5) {
         setState(prev => ({
           ...prev,
-          lastError: 'Service Worker 连接失败，正在重试…',
+          lastError: t('chat.session.reconnecting'),
         }));
       }
       retryTimer = setTimeout(connect, delay);
@@ -269,7 +271,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
   const send = useCallback((text: string, attachments?: Attachment[]) => {
     if (!text.trim()) return;
     if (!portRef.current) {
-      setState(prev => ({ ...prev, lastError: '未连接到后台服务，请稍后再试' }));
+      setState(prev => ({ ...prev, lastError: t('chat.session.notConnected') }));
       return;
     }
     // Allocate sessionId client-side on first send so cancel() works even if
@@ -310,19 +312,37 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     const sessionId = sessionIdRef.current;
     if (!sessionId) return;
     if (!portRef.current) {
-      setState(prev => ({ ...prev, lastError: '未连接到后台服务，请稍后再试' }));
+      setState(prev => ({ ...prev, lastError: t('chat.session.notConnected') }));
       return;
     }
-    // Optimistically flip running + clear any prior error. This hides the
-    // retry button immediately so a double-click in the same window can't
-    // fire a second IPC. Multi-window concurrent clicks land at the BG as
-    // duplicates and are silently no-op'd there; this window's optimistic
-    // state converges to the in-flight retry's broadcasts.
-    setState(prev => ({
-      ...prev,
-      isAgentRunning: true,
-      lastError: null,
-    }));
+    // Optimistic update: locally apply the SAME truncation the background
+    // will perform (drop everything after the last user message) and flip
+    // `isAgentRunning` to true. Three effects, all immediate:
+    //
+    //   1. The errored / unwanted assistant bubble disappears right away —
+    //      no waiting for the BG round-trip's `session_state` broadcast,
+    //      which used to leave the streaming cursor stranded at the end
+    //      of the old bubble for ~100–300ms.
+    //   2. Retry button hides instantly so a double-click in this window
+    //      can't fire a second IPC.
+    //   3. Prior `lastError` clears.
+    //
+    // Multi-window safety: every subscribed window receives the BG's
+    // authoritative `session_state` later; this window's local state
+    // converges to that broadcast without flicker because the shared
+    // `truncateForRetry` helper guarantees we computed the same array.
+    // Defensive bail: if there's somehow no user message to retry from,
+    // skip the optimistic step and let the background's own no-op path
+    // surface the issue (matches BG's defensive throw).
+    setState(prev => {
+      const truncated = truncateForRetry(prev.messages);
+      return {
+        ...prev,
+        messages: truncated ?? prev.messages,
+        isAgentRunning: true,
+        lastError: null,
+      };
+    });
     postMessage({ type: 'retry', sessionId });
   }, [postMessage]);
 

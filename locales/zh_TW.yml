@@ -304,6 +304,13 @@ chat:
   session:
     loading: "載入工作階段…"
     modelError: "模型回傳錯誤"
+    # 使用者中途點停後，在 assistant 氣泡裡顯示的提示。
+    # 保持中性語氣——不是錯誤，只是沒跑完。
+    cancelled: "已取消"
+    # 背景端口還沒連上時（通常發生在 SW 剛唤醒 / 斷線重連期間）點發送/重試會看到這條
+    notConnected: "尚未連接到背景服務，請稍後再試"
+    # 自動重連多次失敗後提示。語氣是「還在試」，不保證能連上
+    reconnecting: "連線中斷，正在重試…"
     welcomeReady: "有什麼我可以幫忙的？"
     scrollToBottom: "跳至最新訊息"
 

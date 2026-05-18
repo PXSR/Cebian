@@ -178,6 +178,12 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
               const isLast = idx === messages.length - 1;
               const isStreaming = isLast && effectiveRunning;
               const isError = assistantMsg.stopReason === 'error';
+              // Aborted: either user clicked stop while streaming (pi-agent-core
+              // appends the marker naturally inside `handleRunFailure`), or
+              // user clicked stop while retry was rebuilding (the background's
+              // `handleRebuildAbort` appends the same shape manually). One
+              // rendering rule covers both paths.
+              const isAborted = assistantMsg.stopReason === 'aborted';
 
               // Show header only for the first assistant message in a consecutive group
               let showHeader = true;
@@ -257,6 +263,11 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                   {isError && (
                     <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 mt-2 whitespace-pre-wrap break-all">
                       {assistantMsg.errorMessage ?? t('chat.session.modelError')}
+                    </div>
+                  )}
+                  {isAborted && (
+                    <div className="text-xs text-muted-foreground/80 italic mt-2">
+                      {t('chat.session.cancelled')}
                     </div>
                   )}
                   {/* Generic tool rendering */}

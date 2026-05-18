@@ -120,3 +120,23 @@ export function extractUserAttachments(msg: Message): ParsedUserAttachments {
 
   return result;
 }
+
+/**
+ * Compute the transcript slice that "retry" should restart from: everything
+ * up to and including the most recent user message. Drops the failed/unwanted
+ * assistant turn plus any orphan toolUse / toolResult blocks that came after it.
+ *
+ * Returns `null` when no user message exists — callers should treat this as
+ * "nothing to retry" (the UI normally prevents this, but defensive).
+ *
+ * Shared by the background `retry()` and the sidepanel's optimistic UI update
+ * so both sides truncate identically — multi-window reconciliation never flickers.
+ */
+export function truncateForRetry<M extends { role: string }>(messages: M[]): M[] | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') {
+      return messages.slice(0, i + 1);
+    }
+  }
+  return null;
+}

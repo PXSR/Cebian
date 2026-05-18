@@ -311,6 +311,17 @@ chat:
   session:
     loading: "Loading session…"
     modelError: "Model returned an error"
+    # Shown inside an assistant bubble when the user cancelled the run
+    # (either mid-stream or while a retry was rebuilding). Stays neutral
+    # — cancelling isn't an error, just a stopped attempt.
+    cancelled: "Cancelled"
+    # `lastError` toast shown by the chat composer when send/retry is
+    # attempted before the chrome.runtime port has connected (typically
+    # right after SW wakes up or after a disconnect-retry).
+    notConnected: "Not connected to background service — please try again"
+    # Shown after the auto-reconnect has tried several times without
+    # success. Hints that recovery is in progress, doesn't promise a fix.
+    reconnecting: "Connection lost, retrying…"
     welcomeReady: "What can I help you with?"
     scrollToBottom: "Jump to latest"
 
