@@ -149,6 +149,86 @@ function performInteraction(params: {
   }
 
   /**
+   * Map `KeyboardEvent.key` → legacy `keyCode` / `which` numeric value.
+   *
+   * `new KeyboardEvent(type, { key })` does NOT auto-derive `keyCode` — it
+   * stays `0` unless explicitly set. Lots of real-world pages (百度搜索框、
+   * 老 jQuery 插件、Baidu/Alipay 内嵌组件) still gate behavior on
+   * `e.keyCode === 13` / `=== 8`, so a synthetic event with `keyCode: 0`
+   * is silently ignored. We populate it best-effort.
+   *
+   * Naming key table covers the keys an automation agent realistically
+   * sends. For single-character keys we approximate: letters → uppercase
+   * char code (matches the physical-key semantics of keyCode regardless of
+   * the typed case), digits → char code. Shifted symbols (`!`, `@`, …)
+   * fall through to char code — not the unshifted physical-key code per
+   * spec, but agents almost never `keypress` a single shifted symbol.
+   */
+  function keyCodeFor(k: string): number {
+    const named: Record<string, number> = {
+      Backspace: 8, Tab: 9, Enter: 13,
+      Shift: 16, Control: 17, Alt: 18,
+      Pause: 19, CapsLock: 20, Escape: 27, Space: 32,
+      PageUp: 33, PageDown: 34, End: 35, Home: 36,
+      ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40,
+      Insert: 45, Delete: 46,
+      Meta: 91, ContextMenu: 93,
+      F1: 112, F2: 113, F3: 114, F4: 115, F5: 116, F6: 117,
+      F7: 118, F8: 119, F9: 120, F10: 121, F11: 122, F12: 123,
+      NumLock: 144, ScrollLock: 145,
+      ';': 186, '=': 187, ',': 188, '-': 189, '.': 190, '/': 191, '`': 192,
+      '[': 219, '\\': 220, ']': 221, "'": 222,
+    };
+    if (k in named) return named[k];
+    // Spec spelling for spacebar is the literal " "; the friendly alias
+    // "Space" is also accepted because agents commonly invent that name.
+    if (k === ' ') return 32;
+    if (k.length === 1) {
+      const c = k.charCodeAt(0);
+      // Letters: keyCode is the uppercase code regardless of typed case.
+      if (c >= 0x61 && c <= 0x7A) return c - 32; // a-z → A-Z
+      return c;
+    }
+    return 0;
+  }
+
+  /**
+   * Map `KeyboardEvent.key` → DOM `KeyboardEvent.code` (physical key id,
+   * layout-independent). Modern shortcut libs (tinykeys, CodeMirror 6) read
+   * `code` rather than `key`. Best-effort: letters → `Key{X}`, digits →
+   * `Digit{n}`, named keys → table lookup, otherwise empty string.
+   */
+  function domCodeFor(k: string): string {
+    const named: Record<string, string> = {
+      Backspace: 'Backspace', Tab: 'Tab', Enter: 'Enter',
+      Shift: 'ShiftLeft', Control: 'ControlLeft', Alt: 'AltLeft',
+      Pause: 'Pause', CapsLock: 'CapsLock', Escape: 'Escape',
+      PageUp: 'PageUp', PageDown: 'PageDown', End: 'End', Home: 'Home',
+      ArrowLeft: 'ArrowLeft', ArrowUp: 'ArrowUp',
+      ArrowRight: 'ArrowRight', ArrowDown: 'ArrowDown',
+      Insert: 'Insert', Delete: 'Delete',
+      Meta: 'MetaLeft', ContextMenu: 'ContextMenu',
+      F1: 'F1', F2: 'F2', F3: 'F3', F4: 'F4', F5: 'F5', F6: 'F6',
+      F7: 'F7', F8: 'F8', F9: 'F9', F10: 'F10', F11: 'F11', F12: 'F12',
+      NumLock: 'NumLock', ScrollLock: 'ScrollLock',
+      ';': 'Semicolon', '=': 'Equal', ',': 'Comma', '-': 'Minus',
+      '.': 'Period', '/': 'Slash', '`': 'Backquote',
+      '[': 'BracketLeft', '\\': 'Backslash', ']': 'BracketRight',
+      "'": 'Quote',
+    };
+    if (k in named) return named[k];
+    if (k === ' ') return 'Space';
+    if (k.length === 1) {
+      const c = k.charCodeAt(0);
+      if ((c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A)) {
+        return 'Key' + k.toUpperCase();
+      }
+      if (c >= 0x30 && c <= 0x39) return 'Digit' + k;
+    }
+    return '';
+  }
+
+  /**
    * Resolve the target element + concrete click point for pointer-based actions
    * (click / dblclick / rightclick / hover). Unlike `getEl()` this always
    * produces a `{ clientX, clientY }` pair so downstream `MouseEvent` /
@@ -385,9 +465,26 @@ function performInteraction(params: {
       } else {
         target = document.activeElement ?? document.body;
       }
-      const init: KeyboardEventInit = { key, bubbles: true, ...modInit() };
+      const code = keyCodeFor(key);
+      const init: KeyboardEventInit = {
+        key,
+        code: domCodeFor(key),
+        keyCode: code,
+        which: code,
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        ...modInit(),
+      };
       target.dispatchEvent(new KeyboardEvent('keydown', init));
-      target.dispatchEvent(new KeyboardEvent('keypress', init));
+      // Real browsers only fire `keypress` for character-producing keys.
+      // Modifier keys (Shift/Control/Alt/Meta/CapsLock/NumLock/ScrollLock)
+      // and non-printable named keys (Backspace/Tab/Escape/Arrow*/F*/Home/
+      // End/PageUp/PageDown/Delete/Insert) do NOT get a keypress. Enter is
+      // kept by all engines for back-compat.
+      if (key.length === 1 || key === 'Enter') {
+        target.dispatchEvent(new KeyboardEvent('keypress', init));
+      }
       target.dispatchEvent(new KeyboardEvent('keyup', init));
       return Promise.resolve(selector ? `Pressed key ${key} on: ${selector}` : `Pressed key: ${key}`);
     }
