@@ -67,9 +67,13 @@ function App() {
 
   const handleSelectSession = useCallback((sessionId: string) => {
     setHistoryOpen(false);
+    // If we're already viewing this session, do nothing — clearing chatTitle
+    // and navigate-to-same-path would wipe the header without triggering a
+    // resubscribe/IPC roundtrip to repopulate it.
+    if (location.pathname === `/chat/${sessionId}`) return;
     setChatTitle('');
     navigate(`/chat/${sessionId}`);
-  }, [navigate]);
+  }, [location.pathname, navigate]);
 
   const handleDeleteSession = useCallback((deletedId: string) => {
     // If the deleted session is the one currently open, redirect to new chat
