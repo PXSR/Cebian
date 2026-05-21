@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
@@ -9,7 +9,14 @@ import { HistoryPanel } from '@/components/layout/HistoryPanel';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { themePreference } from '@/lib/storage';
 import { ChatPage } from './pages/chat';
-import { SettingsRoutes } from './pages/settings';
+
+// Lazy-load Settings: pulls in CodeMirror, react-arborist, lightning-fs,
+// all provider/MCP forms, etc. — a large chunk that's only needed once
+// the user opens /settings. Keeping it out of the sidepanel's initial
+// bundle is the single biggest first-paint win.
+const SettingsRoutes = lazy(() =>
+  import('./pages/settings').then(m => ({ default: m.SettingsRoutes })),
+);
 
 /** Resolve 'system' to the actual theme based on OS preference (defaults to 'light'). */
 function resolveTheme(pref: 'dark' | 'light' | 'system'): 'dark' | 'light' {
@@ -101,7 +108,14 @@ function App() {
         <Routes>
           <Route path="/chat/new" element={<ChatPage onOpenSettings={() => navigate('/settings')} onTitleChange={setChatTitle} />} />
           <Route path="/chat/:sessionId" element={<ChatPage onOpenSettings={() => navigate('/settings')} onTitleChange={setChatTitle} />} />
-          <Route path="/settings/*" element={<SettingsRoutes basePath="/settings" showBackButton showOpenInTab />} />
+          <Route
+            path="/settings/*"
+            element={
+              <Suspense fallback={null}>
+                <SettingsRoutes basePath="/settings" showBackButton showOpenInTab />
+              </Suspense>
+            }
+          />
           <Route path="*" element={<Navigate to="/chat/new" replace />} />
         </Routes>
 
