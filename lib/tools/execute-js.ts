@@ -83,62 +83,54 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
 
     const result = results?.[0];
 
-    // Two execution paths produce two different result shapes:
-    //   - MAIN-world success: `result.result` is the raw return value (any
-    //     JSON-serializable type, or `undefined` if the script didn't return).
-    //   - CSP fallback: `executeViaDebugger` returns a string that is ALREADY
-    //     display-formatted (the helper applies the same string-verbatim /
-    //     JSON.stringify(_, null, 2) rules we use below). We don't have access
-    //     to the original raw value through that path, so `outputPath` writes
-    //     the helper's formatted text as-is.
-    let rawValue: unknown;
-    let cspFormatted: string | null = null;
+    // Compute a single display-formatted `text` for both execution paths and
+    // both output sinks (inline return / outputPath write):
+    //   - MAIN-world success: `result.result` is the raw return value. We
+    //     format with "string verbatim, else JSON.stringify(_, null, 2)" —
+    //     the same rule executeViaDebugger uses for the CSP fallback path.
+    //     Aligning these means `return "foo"` produces `foo` (not `"foo"`)
+    //     regardless of which execution path was taken.
+    //   - CSP fallback: the helper already returns a display-formatted string;
+    //     we use it as-is.
+    // `canWrite` is true iff `text` represents a real payload — undefined /
+    // null returns, serialization failures, and the helper's sentinel
+    // strings all flip it false so the outputPath branch refuses to write.
+    let text: string;
+    let canWrite: boolean;
     if (result?.result === CSP_BLOCKED) {
-      cspFormatted = await executeViaDebugger(tabId, params.code);
+      text = await executeViaDebugger(tabId, params.code);
+      canWrite = text !== '(no return value)' && !text.startsWith('Error: ');
     } else {
-      rawValue = result?.result;
+      const rawValue = result?.result;
+      // `null` is a valid JSON value, so inline-return still renders it
+      // ("null") for backward compatibility — but `outputPath` rejects it
+      // because writing the literal 4-char string `null` to a file is
+      // almost never what the agent intended.
+      if (rawValue === undefined) {
+        text = '(no return value)';
+        canWrite = false;
+      } else {
+        canWrite = rawValue !== null;
+        try {
+          text = typeof rawValue === 'string' ? rawValue : JSON.stringify(rawValue, null, 2);
+        } catch {
+          text = `(result could not be serialized — got ${typeof rawValue})`;
+          canWrite = false;
+        }
+      }
     }
 
     // ── outputPath branch ──
     // Bytes land directly in VFS; the agent only sees path + size + preview.
     if (params.outputPath) {
-      let textToWrite: string;
-      if (cspFormatted !== null) {
-        // CSP fallback path. The helper may have returned a sentinel for
-        // "no value" or an "Error: ..." string from CDP — surface both as
-        // errors instead of writing them to disk.
-        if (cspFormatted === '(no return value)') {
-          return {
-            content: [{ type: 'text', text: `Error: script returned no value — nothing to write to ${params.outputPath}. Use 'return <value>' in your script.` }],
-            details: { status: 'error' },
-          };
-        }
-        if (cspFormatted.startsWith('Error: ')) {
-          return {
-            content: [{ type: 'text', text: cspFormatted }],
-            details: { status: 'error' },
-          };
-        }
-        textToWrite = cspFormatted;
-      } else {
-        if (rawValue === undefined || rawValue === null) {
-          return {
-            content: [{ type: 'text', text: `Error: script returned ${rawValue === undefined ? 'undefined' : 'null'} — nothing to write to ${params.outputPath}. Use 'return <value>' in your script.` }],
-            details: { status: 'error' },
-          };
-        }
-        try {
-          textToWrite = typeof rawValue === 'string' ? rawValue : JSON.stringify(rawValue, null, 2);
-        } catch {
-          return {
-            content: [{ type: 'text', text: `Error: result could not be serialized to text (got ${typeof rawValue}).` }],
-            details: { status: 'error' },
-          };
-        }
+      if (!canWrite) {
+        return {
+          content: [{ type: 'text', text: `Error: ${text} — nothing written to ${params.outputPath}. Use 'return <value>' in your script with a non-empty payload.` }],
+          details: { status: 'error' },
+        };
       }
-
       try {
-        await vfs.writeFile(params.outputPath, textToWrite, 'utf8');
+        await vfs.writeFile(params.outputPath, text, 'utf8');
       } catch (err) {
         return {
           content: [{ type: 'text', text: `Error writing ${params.outputPath}: ${(err as Error).message}` }],
@@ -147,28 +139,17 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
       }
       invalidateSkillIndexIfNeeded(params.outputPath);
 
-      const byteLen = new TextEncoder().encode(textToWrite).length;
-      const preview = textToWrite.length > 1024
-        ? textToWrite.slice(0, 1024) + '\n…(preview truncated; full content is on disk)'
-        : textToWrite;
+      const byteLen = new TextEncoder().encode(text).length;
+      const preview = text.length > 1024
+        ? text.slice(0, 1024) + '\n…(preview truncated; full content is on disk)'
+        : text;
       return {
         content: [{ type: 'text', text: `Wrote ${params.outputPath} (${byteLen} bytes)\nPreview:\n---\n${preview}\n---` }],
         details: { status: 'done' },
       };
     }
 
-    // ── Inline-return branch (unchanged behavior) ──
-    let text: string;
-    if (cspFormatted !== null) {
-      text = cspFormatted;
-    } else {
-      try {
-        text = rawValue === undefined ? '(no return value)' : JSON.stringify(rawValue, null, 2);
-      } catch {
-        text = `(result could not be serialized — got ${typeof rawValue})`;
-      }
-    }
-
+    // ── Inline-return branch ──
     return {
       content: [{ type: 'text', text }],
       details: { status: 'done' },
