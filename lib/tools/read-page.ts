@@ -4,6 +4,8 @@ import { TOOL_READ_PAGE } from '@/lib/types';
 import { executeInTabWithArgs } from '@/lib/tab-helpers';
 import { ensureOffscreen } from './offscreen';
 import type { OffscreenRequest, OffscreenResponse } from '@/entrypoints/offscreen/main';
+import { vfs } from '@/lib/vfs';
+import { invalidateSkillIndexIfNeeded } from './fs-helpers';
 
 const ReadPageParameters = Type.Object({
   mode: Type.Union(
@@ -36,7 +38,17 @@ const ReadPageParameters = Type.Object({
       description:
         'Maximum character length of the returned content. Defaults to 20000. ' +
         'If you expect or observe truncation, raise this value in a single call (a few times the default is typically enough) — do NOT loop the tool with multiple selectors or repeated calls to stitch a larger result together. ' +
-        'Truncated responses end with a "...(truncated at N chars)" marker.',
+        'Truncated responses end with a "...(truncated at N chars)" marker. ' +
+        'Ignored entirely when `outputPath` is set.',
+    }),
+  ),
+  outputPath: Type.Optional(
+    Type.String({
+      description:
+        'If set, the full extracted content is written to this absolute VFS path (e.g. "/workspaces/abc/page.md") and only a short summary is returned to you. ' +
+        'Use this whenever the natural extraction is large enough that returning it inline would bloat the conversation — the bytes go straight to disk and never enter your context. ' +
+        '`maxLength` is ignored when this is set: the full extraction is written regardless of size, then a 1KB preview is returned. ' +
+        'Parent directories are created automatically. Existing files are overwritten.',
     }),
   ),
   frameId: Type.Optional(
@@ -872,6 +884,7 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
     '"outline" (page structure overview — visual regions with selectors, positions, interactive elements; also reports any blocking overlay / modal that may intercept clicks; use to understand layout before acting), ' +
     '"text" (plain text), "html" (cleaned HTML). ' +
     'Optionally scope to a CSS selector. ' +
+    'For large pages where the full content matters but would bloat the conversation, set `outputPath` to write the extraction directly to VFS. ' +
     'Use this before answering questions about page content.',
   parameters: ReadPageParameters,
 
@@ -921,6 +934,31 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
       }
       default:
         content = await executeInTabWithArgs(tabId, extractText, [params.selector ?? null], params.frameId);
+    }
+
+    // ── outputPath branch ──
+    // Full extraction lands directly in VFS; the agent only sees path +
+    // byte count + 1KB preview. maxLength is intentionally ignored — the
+    // whole point of outputPath is to bypass the size limiter.
+    if (params.outputPath) {
+      try {
+        await vfs.writeFile(params.outputPath, content, 'utf8');
+      } catch (err) {
+        return {
+          content: [{ type: 'text', text: `Error writing ${params.outputPath}: ${(err as Error).message}` }],
+          details: { status: 'error' },
+        };
+      }
+      invalidateSkillIndexIfNeeded(params.outputPath);
+
+      const byteLen = new TextEncoder().encode(content).length;
+      const preview = content.length > 1024
+        ? content.slice(0, 1024) + '\n…(preview truncated; full content is on disk)'
+        : content;
+      return {
+        content: [{ type: 'text', text: `Wrote ${params.outputPath} (${byteLen} bytes, mode=${mode})\nPreview:\n---\n${preview}\n---` }],
+        details: { status: 'done' },
+      };
     }
 
     return {
