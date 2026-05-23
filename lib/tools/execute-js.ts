@@ -102,15 +102,17 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
       canWrite = text !== '(no return value)' && !text.startsWith('Error: ');
     } else {
       const rawValue = result?.result;
-      // `null` is a valid JSON value, so inline-return still renders it
-      // ("null") for backward compatibility — but `outputPath` rejects it
-      // because writing the literal 4-char string `null` to a file is
-      // almost never what the agent intended.
-      if (rawValue === undefined) {
+      // null and undefined are treated identically: neither is a usable
+      // payload, so both render as the same sentinel inline and are both
+      // rejected by outputPath. Pre-refactor this only short-circuited on
+      // undefined; `return null` used to leak through as the literal string
+      // "null", which the model could mistake for the error info actually
+      // being null instead of "the script returned nothing meaningful".
+      if (rawValue === undefined || rawValue === null) {
         text = '(no return value)';
         canWrite = false;
       } else {
-        canWrite = rawValue !== null;
+        canWrite = true;
         try {
           text = typeof rawValue === 'string' ? rawValue : JSON.stringify(rawValue, null, 2);
         } catch {
@@ -125,7 +127,7 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
     if (params.outputPath) {
       if (!canWrite) {
         return {
-          content: [{ type: 'text', text: `Error: ${text} — nothing written to ${params.outputPath}. Use 'return <value>' in your script with a non-empty payload.` }],
+          content: [{ type: 'text', text: `Error: nothing written to ${params.outputPath} — script produced no usable return value: ${text}. Use 'return <value>' with a serializable, non-empty payload.` }],
           details: { status: 'error' },
         };
       }
