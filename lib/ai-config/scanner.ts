@@ -6,7 +6,7 @@
 //
 // Skill index is cached in-memory with a 30-minute TTL and can be proactively invalidated.
 //
-import { vfs } from '@/lib/vfs';
+import { vfs, normalizePath } from '@/lib/vfs';
 import { CEBIAN_PROMPTS_DIR, CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE, SKILLS_PREAMBLE } from '@/lib/constants';
 import { escapeXml } from '@/lib/utils';
 import { parseFrontmatter } from '@/lib/frontmatter';
@@ -43,6 +43,38 @@ export function invalidateSkillIndex(): void {
   _skillIndex = null;
   _skillIndexTimestamp = 0;
 }
+
+// ─── Auto-invalidation on VFS mutations ───
+
+const SKILLS_ROOT = normalizePath(CEBIAN_SKILLS_DIR);
+
+function pathTouchesSkills(p: string): boolean {
+  return p === SKILLS_ROOT || p.startsWith(SKILLS_ROOT + '/');
+}
+
+// Module-level side effect: subscribe once when this module is first
+// imported. scanner.ts is imported eagerly by agent-manager.ts and
+// background/index.ts, so the listener is wired during SW boot before
+// any tool runs.
+//
+// Cross-context invalidation also flows through this listener: a UI write
+// to ~/.cebian/skills/ is broadcast via chrome.runtime by vfs.emitChange,
+// the SW's vfs bridge re-emits locally, and this listener fires — keeping
+// the SW's in-memory cache in sync without any manual sendMessage hop.
+//
+// Also handles renames where ONLY the old path is in the skills tree
+// (e.g. moving a SKILL.md OUT of ~/.cebian/skills/) — the previous
+// invalidateSkillIndexIfNeeded helper checked just one path and would
+// miss this case.
+vfs.onChange((event) => {
+  if (pathTouchesSkills(event.path)) {
+    invalidateSkillIndex();
+    return;
+  }
+  if (event.kind === 'rename' && pathTouchesSkills(event.oldPath)) {
+    invalidateSkillIndex();
+  }
+});
 
 // ─── Prompt Scanner ───
 
