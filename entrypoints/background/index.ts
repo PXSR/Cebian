@@ -3,7 +3,6 @@ import { agentManager } from './agent-manager';
 import { sessionStore } from './session-store';
 import { recorder } from './recorder';
 import { seedDevStorage } from './dev-seed';
-import { invalidateSkillIndex } from '@/lib/ai-config/scanner';
 import { getMCPManager } from '@/lib/mcp/manager';
 import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage } from '@/lib/protocol';
 import { isRecorderRuntimeMessage, RECORDER_MSG_KIND, type RecorderControlMessage } from '@/lib/recorder/protocol';
@@ -599,13 +598,7 @@ export default defineBackground(() => {
     }
   }
 
-  // ─── Skill index invalidation listener ───
-
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-    if (msg?.type === 'invalidate_skill_index') {
-      invalidateSkillIndex();
-      return false;
-    }
     if (msg?.type === 'mcp_status') {
       // One-shot status query for the Settings UI. Returns a map keyed by
       // server id, only for currently-enabled servers (disabled ones never

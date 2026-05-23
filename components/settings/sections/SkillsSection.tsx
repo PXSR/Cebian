@@ -25,8 +25,10 @@ import { t } from '@/lib/i18n';
 /**
  * SkillsSection — multi-file agent skill manager under /settings/skills[/*].
  *
- * Supports nested paths (e.g. `my-skill/scripts/foo.js`). On save, notifies
- * the background service worker to clear its cached skill index.
+ * Supports nested paths (e.g. `my-skill/scripts/foo.js`). Edits and imports
+ * go through `vfs.writeFile`, which broadcasts change events across
+ * extension contexts so the background scanner's cached skill index is
+ * invalidated automatically — no manual notification needed.
  *
  * Contributes four toolbar actions: create, import, export current, export
  * all. The domain scaffolding lives in `lib/ai-config/skill-creator.ts` and
@@ -54,11 +56,6 @@ export function SkillsSection() {
       navigate(`${basePath}/skills`, { replace: true });
     }
   }, [basePath, navigate]);
-
-  const handleSave = useCallback(() => {
-    // Background caches the skill index; invalidate it so next agent turn re-reads.
-    try { chrome.runtime.sendMessage({ type: 'invalidate_skill_index' }); } catch { /* ignore */ }
-  }, []);
 
   const handleCreateSkill = useCallback(async () => {
     const { entryFile } = await createSkillTemplate(CEBIAN_SKILLS_DIR);
@@ -135,11 +132,12 @@ export function SkillsSection() {
   }, [formatError, triggerDownload]);
 
   /** Caller for the import preview dialog. Refreshes the file tree and
-   *  shows a localized success toast based on package type. */
+   *  shows a localized success toast based on package type. The scanner's
+   *  cached skill index is invalidated automatically via the vfs change
+   *  events emitted by the underlying writes — no manual notification
+   *  needed. */
   const handleImported = useCallback((result: SkillImportResult) => {
     workspaceRef.current?.refresh();
-    // Best-effort: notify the background to drop its cached skill index.
-    try { chrome.runtime.sendMessage({ type: 'invalidate_skill_index' }); } catch { /* ignore */ }
     if (result.installed.length === 1) {
       toast.success(t('settings.skills.importSuccess', [result.installed[0].targetDirName]));
     } else {
@@ -224,7 +222,6 @@ export function SkillsSection() {
         root={CEBIAN_SKILLS_DIR}
         relativePath={relativePath}
         onSelectRelative={handleSelect}
-        onSave={handleSave}
         allowNewFolder
         panelWidthStorage={settingsFilePanelWidth}
         compactMode={breakpoint === 'compact'}
