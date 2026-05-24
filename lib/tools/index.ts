@@ -6,6 +6,7 @@ import { interactTool } from './interact';
 import { inspectTool } from './inspect';
 import { tabTool } from './tab';
 import { screenshotTool } from './screenshot';
+import { pdfTool } from './pdf';
 import { fsCreateFileTool } from './fs-create-file';
 import { fsEditFileTool } from './fs-edit-file';
 import { fsMkdirTool } from './fs-mkdir';
@@ -24,7 +25,7 @@ import { createMCPAgentTool } from './mcp-tool';
 
 /** Non-interactive tools shared by all sessions. */
 const sharedTools: AgentTool<any>[] = [
-  executeJsTool, readPageTool, interactTool, inspectTool, tabTool, screenshotTool,
+  executeJsTool, readPageTool, interactTool, inspectTool, tabTool, screenshotTool, pdfTool,
   fsCreateFileTool, fsEditFileTool, fsMkdirTool, fsRenameTool, fsDeleteTool,
   fsReadFileTool, fsListTool, fsSearchTool, fsSaveUrlTool,
   runSkillTool,

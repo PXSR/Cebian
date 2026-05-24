@@ -2,6 +2,8 @@
 // Collects browser tab info + active page metadata + user selection.
 // Returns plain text lines; the caller wraps them in a <context> block.
 
+import { isLikelyPdfUrl } from '@/lib/tools/pdf';
+
 /** Strip all structural XML tags used in the prompt envelope to prevent injection. */
 function sanitizeForContext(s: string): string {
   return s.replace(/<\/?(agent-config|reminder-instructions|attachments|context|user-request)\b[^>]*>/gi, '');
@@ -86,6 +88,11 @@ export async function gatherPageContext(): Promise<string> {
   lines.push(`[Active Tab] ${sanitizeForContext(activeTab.title ?? '')} | ${sanitizeForContext(activeTab.url ?? '')}`);
   if (activeTab.id != null) lines.push(`  tabId: ${activeTab.id}`);
   lines.push(`  windowId: ${activeTab.windowId}`);
+  // PDF 提示：URL 后缀启发式，零网络。让 agent 优先尝试 `pdf` 工具，
+  // 不用走一遍 `read_page` 才发现是 PDF。仅根据 URL 猜测，加 “suspected” 标记。
+  if (isLikelyPdfUrl(activeTab.url)) {
+    lines.push('  contentType: application/pdf (suspected from URL)');
+  }
   if (meta.readyState) lines.push(`  readyState: ${meta.readyState}`);
   if (meta.viewportWidth != null && meta.viewportHeight != null) lines.push(`  viewport: ${meta.viewportWidth}×${meta.viewportHeight}`);
   if (meta.scrollX != null) lines.push(`  scrollPosition: ${meta.scrollX}, ${meta.scrollY}`);

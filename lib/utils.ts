@@ -86,3 +86,10 @@ export function unescapeXml(s: string): string {
     .replace(/&gt;/g, '>')
     .replace(/&amp;/g, '&');
 }
+
+/** Escape regex metacharacters in a string so it can be embedded inside a
+ *  `RegExp` source as a literal match. Generic — no callers required to
+ *  be source code-related. */
+export function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}

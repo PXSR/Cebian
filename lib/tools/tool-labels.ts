@@ -35,6 +35,8 @@ export function getToolLabel(name: string, args: Record<string, any> = {}): stri
       return getTabLabel(args);
     case 'screenshot':
       return t('tools.screenshot');
+    case 'pdf':
+      return getPdfLabel(args);
     case 'ask_user':
       return t('tools.askUser');
     case 'fs_create_file':
@@ -117,5 +119,24 @@ function getTabLabel(args: Record<string, any>): string {
     case 'reload': return t('tools.tab.reload');
     case 'list_frames': return t('tools.tab.listFrames');
     default: return t('tools.tab.unknown', [args.action ?? 'unknown']);
+  }
+}
+
+function getPdfLabel(args: Record<string, any>): string {
+  switch (args.action) {
+    case 'info':
+      return t('tools.pdf.info');
+    case 'read': {
+      const range = args.pageRange ? String(args.pageRange) : 'all pages';
+      return t('tools.pdf.read', [range]);
+    }
+    case 'search': {
+      const q = typeof args.query === 'string' && args.query.length > 30
+        ? args.query.slice(0, 27) + '...'
+        : (args.query ?? '');
+      return t('tools.pdf.search', [q]);
+    }
+    default:
+      return t('tools.pdf.unknown', [args.action ?? 'unknown']);
   }
 }

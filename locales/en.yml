@@ -379,6 +379,14 @@ tools:
   executeJs: "Running script"
   screenshot: "Taking page screenshot"
   askUser: "Waiting for user reply"
+  pdf:
+    info: "Reading PDF metadata"
+    # $1 = page range (e.g. "1-10") or the literal "all pages"
+    read: "Reading PDF text ($1)"
+    # $1 = search query (truncated)
+    search: "Searching PDF for \"$1\""
+    # $1 = action name
+    unknown: "pdf: $1"
   # $1 = skill name
   runSkill: "Running skill script $1"
   # $1 = MCP server slug (display form), $2 = remote tool name

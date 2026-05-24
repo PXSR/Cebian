@@ -46,6 +46,7 @@
     "fflate": "^0.8.2",
     "front-matter": "^4.0.2",
     "lucide-react": "^1.8.0",
+    "pdfjs-dist": "^5.7.284",
     "picomatch": "^4.0.4",
     "radix-ui": "^1.4.3",
     "react": "^19.2.4",

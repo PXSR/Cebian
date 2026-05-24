@@ -368,6 +368,14 @@ tools:
   executeJs: "正在執行腳本"
   screenshot: "正在擷取頁面螢幕截圖"
   askUser: "等待使用者回覆"
+  pdf:
+    info: "正在讀取 PDF 資訊"
+    # $1 = 頁碼範圍（如 "1-10"）或字面量 "all pages"
+    read: "正在擷取 PDF 文字 ($1)"
+    # $1 = 搜尋關鍵字（截斷後）
+    search: "正在 PDF 內搜尋 \"$1\""
+    # $1 = action 名稱
+    unknown: "pdf: $1"
   # $1 = 技能名稱
   runSkill: "正在執行技能腳本 $1"
   # $1 = MCP 伺服器 slug（展示形式），$2 = 遠端工具名

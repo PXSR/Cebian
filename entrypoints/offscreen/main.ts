@@ -4,16 +4,69 @@
 import { Readability } from '@mozilla/readability';
 import TurndownService from 'turndown';
 import { gfm } from 'turndown-plugin-gfm';
+import {
+  handlePdfInfo,
+  handlePdfText,
+  handlePdfSearch,
+  type PdfInfo,
+  type PdfTextResult,
+  type PdfSearchResult,
+} from './pdf';
 
 // ─── Message types ───
 
 export type OffscreenRequest =
   | { type: 'html-to-markdown'; html: string; readability?: { url: string } }
-  | { type: 'crop-image'; imageData: string; crop: { x: number; y: number; width: number; height: number } };
+  | { type: 'crop-image'; imageData: string; crop: { x: number; y: number; width: number; height: number } }
+  | { type: 'pdf-info'; url: string }
+  | { type: 'pdf-text'; url: string; pageRange?: string; maxChars?: number }
+  | {
+      type: 'pdf-search';
+      url: string;
+      query: string;
+      pageRange?: string;
+      regex?: boolean;
+      caseInsensitive?: boolean;
+      maxHits?: number;
+    };
 
+/** Response shape for the original handlers (html-to-markdown, crop-image)
+ *  whose `result` is always a string. New PDF handlers use the typed
+ *  variants below to keep their structured payloads strongly typed at the
+ *  call site without breaking existing callers. */
 export interface OffscreenResponse {
   result?: string;
   error?: string;
+}
+
+export interface OffscreenPdfInfoResponse {
+  result?: PdfInfo;
+  error?: string;
+}
+export interface OffscreenPdfTextResponse {
+  result?: PdfTextResult;
+  error?: string;
+}
+export interface OffscreenPdfSearchResponse {
+  result?: PdfSearchResult;
+  error?: string;
+}
+
+// ─── PDF error normalization ───
+// pdf.js v5 doesn't export `PasswordException` as a public symbol but
+// still throws errors whose `name` is `'PasswordException'`. Detect by
+// name so users get a useful message instead of pdf.js's internal text.
+function formatPdfError(err: unknown): string {
+  if (err instanceof Error) {
+    if (err.name === 'PasswordException') {
+      return 'PDF is password-protected (unsupported).';
+    }
+    if (err.name === 'InvalidPDFException') {
+      return `Invalid PDF: ${err.message}`;
+    }
+    return err.message || String(err);
+  }
+  return String(err);
 }
 
 // ─── Processing functions ───
@@ -101,6 +154,33 @@ chrome.runtime.onMessage.addListener(
       cropImage(req.imageData, req.crop)
         .then(result => sendResponse({ result } satisfies OffscreenResponse))
         .catch(err => sendResponse({ error: (err as Error).message } satisfies OffscreenResponse));
+      return true;
+    }
+
+    // ─── PDF handlers ───
+    // 通用收尾：把 PDF handler 抛出的 Error 收成 `OffscreenResponse.error`。
+    // password-protected 等场景在 pdf.js 里抛 PasswordException，我们把它
+    // 标识化一下让上层 UI 文案能识别。
+    if (req.type === 'pdf-info') {
+      handlePdfInfo(req.url)
+        .then(result => sendResponse({ result } satisfies OffscreenPdfInfoResponse))
+        .catch(err => sendResponse({ error: formatPdfError(err) } satisfies OffscreenPdfInfoResponse));
+      return true;
+    }
+    if (req.type === 'pdf-text') {
+      handlePdfText(req.url, req.pageRange, req.maxChars)
+        .then(result => sendResponse({ result } satisfies OffscreenPdfTextResponse))
+        .catch(err => sendResponse({ error: formatPdfError(err) } satisfies OffscreenPdfTextResponse));
+      return true;
+    }
+    if (req.type === 'pdf-search') {
+      handlePdfSearch(req.url, req.query, req.pageRange, {
+        regex: req.regex,
+        caseInsensitive: req.caseInsensitive,
+        maxHits: req.maxHits,
+      })
+        .then(result => sendResponse({ result } satisfies OffscreenPdfSearchResponse))
+        .catch(err => sendResponse({ error: formatPdfError(err) } satisfies OffscreenPdfSearchResponse));
       return true;
     }
 

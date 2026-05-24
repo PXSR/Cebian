@@ -37,6 +37,8 @@ export const TOOL_INSPECT = 'inspect' as const;
 export const TOOL_TAB = 'tab' as const;
 /** Tool that captures a screenshot of the active tab */
 export const TOOL_SCREENSHOT = 'screenshot' as const;
+/** Tool that reads / searches PDF tabs via pdf.js inside the offscreen document */
+export const TOOL_PDF = 'pdf' as const;
 
 // ─── Filesystem tool name constants ───
 

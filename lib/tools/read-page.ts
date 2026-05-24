@@ -3,6 +3,7 @@ import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_READ_PAGE } from '@/lib/types';
 import { executeInTabWithArgs } from '@/lib/tab-helpers';
 import { ensureOffscreen } from './offscreen';
+import { isLikelyPdfUrl, pdfRedirectHint } from './pdf';
 import type { OffscreenRequest, OffscreenResponse } from '@/entrypoints/offscreen/main';
 import { vfs } from '@/lib/vfs';
 
@@ -892,6 +893,26 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
     const tabId = params.tabId;
     const mode = params.mode ?? 'markdown';
     const maxLength = params.maxLength ?? 20000;
+
+    // ── PDF short-circuit ──
+    // Chrome's built-in PDF viewer renders text to canvas, so injecting
+    // extractText / extractHtml just returns "(page has no body element)".
+    // Detect by URL suffix (cheap, no script injection, no network) and
+    // tell the agent to switch tools instead of returning empty content
+    // that looks like a real failure.
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      if (isLikelyPdfUrl(tab.url)) {
+        return {
+          content: [{ type: 'text', text: pdfRedirectHint(tab.url, tabId) }],
+          details: { status: 'done' },
+        };
+      }
+    } catch {
+      // chrome.tabs.get can fail when the tab was just closed; let the
+      // existing tool path handle the error so we don't mask it with our
+      // own message.
+    }
 
     let content: string;
 
