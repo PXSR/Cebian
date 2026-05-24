@@ -74,7 +74,30 @@ export default defineConfig({
     },
   },
   vite: () => ({
-    plugins: [tailwindcss()],
+    plugins: [
+      // 把 pi-ai 内部 `./anthropic.js` 的相对导入重定向到本地 shim，
+      // 让 Anthropic OAuth 模块（包含一段 base64 字面量 → atob 解码
+      // 的 client ID，会被 Chrome Web Store 审核判定为代码混淆）从
+      // bundle 中彻底剔除。Cebian 不使用 Anthropic OAuth，仅消费 pi-ai
+      // 的 GitHub Copilot / OpenAI Codex 辅助函数；详见
+      // `lib/shims/pi-ai-anthropic.js` 注释。
+      //
+      // `enforce: 'pre'` 让本插件在 Vite 内置解析器之前运行 —— 我们
+      // 拦截的是 raw 相对 specifier (`./anthropic.js`)，必须抢在它被
+      // 解析成绝对路径之前命中。`importer` 路径做正/反斜杠归一化，避免
+      // Windows 路径分隔符影响匹配。
+      {
+        name: 'cebian:stub-pi-ai-anthropic',
+        enforce: 'pre' as const,
+        resolveId(id: string, importer: string | undefined) {
+          if (id !== './anthropic.js' || !importer) return null;
+          const normalized = importer.replace(/\\/g, '/');
+          if (!normalized.includes('/@mariozechner/pi-ai/dist/utils/oauth/')) return null;
+          return path.resolve(__dirname, 'lib/shims/pi-ai-anthropic.js');
+        },
+      },
+      tailwindcss(),
+    ],
     server: {
       // Sandbox pages have origin: null — allow CORS from any origin in dev mode
       cors: true,
