@@ -19,30 +19,20 @@ export const fsRenameTool: AgentTool<typeof FsRenameParameters> = {
     'Rename or move a file or directory in the virtual filesystem.',
   parameters: FsRenameParameters,
 
-  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
+  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{}>> {
     signal?.throwIfAborted();
-    try {
-      if (!(await vfs.exists(params.old_path))) {
-        return {
-          content: [{ type: 'text', text: `Error: path not found: ${params.old_path}` }],
-          details: { status: 'error' },
-        };
-      }
-      // Ensure parent directory of new_path exists
-      const parentDir = params.new_path.substring(0, params.new_path.lastIndexOf('/'));
-      if (parentDir && parentDir !== '/') {
-        await vfs.mkdir(parentDir, { recursive: true });
-      }
-      await vfs.rename(params.old_path, params.new_path);
-      return {
-        content: [{ type: 'text', text: `Renamed ${params.old_path} → ${params.new_path}` }],
-        details: { status: 'done' },
-      };
-    } catch (err) {
-      return {
-        content: [{ type: 'text', text: `Error: ${(err as Error).message}` }],
-        details: { status: 'error' },
-      };
+    if (!(await vfs.exists(params.old_path))) {
+      throw new Error(`Path not found: ${params.old_path}`);
     }
+    // 确保新路径的父目录存在
+    const parentDir = params.new_path.substring(0, params.new_path.lastIndexOf('/'));
+    if (parentDir && parentDir !== '/') {
+      await vfs.mkdir(parentDir, { recursive: true });
+    }
+    await vfs.rename(params.old_path, params.new_path);
+    return {
+      content: [{ type: 'text', text: `Renamed ${params.old_path} → ${params.new_path}` }],
+      details: {},
+    };
   },
 };

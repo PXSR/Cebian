@@ -95,7 +95,7 @@ export const screenshotTool: AgentTool<typeof ScreenshotParameters> = {
     'The response includes a text block with the viewport size, device pixel ratio, and image dimensions — READ IT before passing any pixel coordinate from this image to `interact`. Image pixels = CSS pixels × DPR; `interact` expects CSS pixels, so divide by DPR (and add the crop origin when present).',
   parameters: ScreenshotParameters,
 
-  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
+  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{}>> {
     signal?.throwIfAborted();
     const quality = params.quality ?? 80;
     const tabId = params.tabId;
@@ -123,10 +123,7 @@ export const screenshotTool: AgentTool<typeof ScreenshotParameters> = {
       if (params.selector) {
         const rect = await executeInTabWithArgs(tabId, getElementRect, [params.selector]);
         if (!rect) {
-          return {
-            content: [{ type: 'text', text: `Error: element not found: ${params.selector}` }],
-            details: { status: 'error' },
-          };
+          throw new Error(`Element not found: ${params.selector}`);
         }
         // Stamp crop with the viewport's DPR — single source of truth, avoids
         // inconsistency if display scaling changes between the two in-page calls.
@@ -137,10 +134,8 @@ export const screenshotTool: AgentTool<typeof ScreenshotParameters> = {
 
       // Validate crop dimensions
       if (crop && (crop.width <= 0 || crop.height <= 0)) {
-        return {
-          content: [{ type: 'text', text: 'Error: crop region has zero or negative dimensions.' }],
-          details: { status: 'error' },
-        };
+        const origin = params.selector ? `selector "${params.selector}"` : 'clip';
+        throw new Error(`Crop region has zero or negative dimensions: ${crop.width}×${crop.height} (from ${origin}). Verify the element is visible and laid out, or check the clip values.`);
       }
 
       // Capture full visible tab
@@ -187,7 +182,7 @@ export const screenshotTool: AgentTool<typeof ScreenshotParameters> = {
           { type: 'text', text: meta },
           { type: 'image', data: finalBase64, mimeType: 'image/jpeg' },
         ],
-        details: { status: 'done' },
+        details: {},
       };
     } finally {
       // Restore the previous tab if we swapped

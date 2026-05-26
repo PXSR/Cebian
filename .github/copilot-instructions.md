@@ -50,6 +50,16 @@ Before writing any code, verify placement and structure:
 - Comments should be written in Chinese first, English as fallback. Keep necessary technical terms (API names, library names, protocol fields, error codes, etc.) in English — do not force-translate them.
 - 这一规则只针对新增或修改的注释。不要为没有动过的代码补注释，也不要把现有的英文注释批量翻译成中文。
 
+## Tool Failure Handling
+
+Cebian's agent tools (`lib/tools/*`) implement `AgentTool` from `@mariozechner/pi-agent-core`. The protocol is literal: throw on failure, return on success.
+
+- **Real errors → `throw new Error(<message>)`** (network, invalid input, missing resources, permission denied, parse failure). pi-agent-core sets `message.isError = true`, which flows to `is_error: true` in the LLM payload so the model's retry / replan engages. The thrown `Error.message` is the only thing the LLM sees — phrase it actionably.
+- **Empty results → `return` success with descriptive content** (0 search hits, empty directory, 0 elements matched, PDF has no text layer, chrome API returned undefined). The agent must be able to act on these calmly. Tiebreaker: "can the agent reasonably proceed from this result?" Yes → return; no → throw.
+- **Never re-encode a thrown error as a successful return.** Re-encoding breaks the `isError` signal. `try/catch` itself is fine when the catch branch ends in `throw` — common uses: translating a library exception into an LLM-friendly message (`URL` constructor → "Invalid URL: ...", `parseFrontmatter` → "Failed to parse SKILL.md: ..."), translating a typed error from a library (`mcp-tool.ts` translates `ThrottleError` → friendlier wording), or preserving `AbortError` / `signal.aborted` rethrow so pi-agent-core's cancellation contract still fires (see `fs-save-url.ts`'s fetch handshake catch). `try/finally` for resource cleanup (reader locks, abort listeners, tab-restore) is always fine.
+- **In-page injected functions** (`chrome.scripting.executeScript`) may return a `"Error: ..."` sentinel string instead of throwing, because chrome.scripting swallows in-page rejections. The calling tool **must** translate that sentinel into a real throw at the extension layer before returning — see `runInPageStep` in `interact.ts` for the canonical example.
+- **`details` is a per-tool structured side channel** for UI / logs / persistence; the LLM never sees it. Tools define their own shape (`mcp-tool.ts` uses `{ server, tool, structured, mcpApp? }`; `ask-user.ts` declares a named `AskUserDetails` interface — preferred style for typed details); use `{}` when nothing useful to surface. Don't add a `status` field — that question is now answered by `message.isError`.
+
 ## Debugging & Troubleshooting
 
 - When investigating a bug, if the root cause is uncertain or multiple rounds of investigation haven't resolved it, **stop guessing** — add targeted `console.log` / `console.warn` statements at the suspicious code paths and ask the user to reproduce the issue so the logs can be collected.

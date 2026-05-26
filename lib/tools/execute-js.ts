@@ -53,7 +53,7 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
     'The return value is JSON-serialized and returned in full — do not pre-chunk or probe for a size limit.',
   parameters: ExecuteJsParameters,
 
-  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
+  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{}>> {
     signal?.throwIfAborted();
     const tabId = params.tabId;
 
@@ -98,7 +98,15 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
     let canWrite: boolean;
     if (result?.result === CSP_BLOCKED) {
       text = await executeViaDebugger(tabId, params.code);
-      canWrite = text !== '(no return value)' && !text.startsWith('Error: ');
+      // CDP 走的 fallback 返回的是字符串（包含 sentinel）：
+      //   "(no return value)" → 没有返回值
+      //   "Error: <msg>"      → 页面里抛了异常
+      //   其它                → 正常返回值（已经被显示格式化过）
+      // 真异常必须 throw 出去，否则会被当作"成功返回了一段说错话的字符串"。
+      if (text.startsWith('Error: ')) {
+        throw new Error(text.slice('Error: '.length).trim());
+      }
+      canWrite = text !== '(no return value)';
     } else {
       const rawValue = result?.result;
       // null and undefined are treated identically: neither is a usable
@@ -125,19 +133,9 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
     // Bytes land directly in VFS; the agent only sees path + size + preview.
     if (params.outputPath) {
       if (!canWrite) {
-        return {
-          content: [{ type: 'text', text: `Error: nothing written to ${params.outputPath} — script produced no usable return value: ${text}. Use 'return <value>' with a serializable, non-empty payload.` }],
-          details: { status: 'error' },
-        };
+        throw new Error(`Nothing written to ${params.outputPath} — script produced no usable return value: ${text}. Use 'return <value>' with a serializable, non-empty payload.`);
       }
-      try {
-        await vfs.writeFile(params.outputPath, text, 'utf8');
-      } catch (err) {
-        return {
-          content: [{ type: 'text', text: `Error writing ${params.outputPath}: ${(err as Error).message}` }],
-          details: { status: 'error' },
-        };
-      }
+      await vfs.writeFile(params.outputPath, text, 'utf8');
 
       const byteLen = new TextEncoder().encode(text).length;
       const preview = text.length > 1024
@@ -145,14 +143,14 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
         : text;
       return {
         content: [{ type: 'text', text: `Wrote ${params.outputPath} (${byteLen} bytes)\nPreview:\n---\n${preview}\n---` }],
-        details: { status: 'done' },
+        details: {},
       };
     }
 
     // ── Inline-return branch ──
     return {
       content: [{ type: 'text', text }],
-      details: { status: 'done' },
+      details: {},
     };
   },
 };

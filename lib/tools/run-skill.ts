@@ -55,7 +55,7 @@ export const runSkillTool: AgentTool<typeof RunSkillParameters> = {
     'If they chose the "always allow" option, also set always_allow=true. If the user denies, do not call this tool again.',
   parameters: RunSkillParameters,
 
-  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
+  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{}>> {
     signal?.throwIfAborted();
 
     const { skill, script, args = {}, tabId, confirmation_nonce, always_allow = false } = params;
@@ -65,41 +65,25 @@ export const runSkillTool: AgentTool<typeof RunSkillParameters> = {
     const normalizedSkillsRoot = normalizePath(CEBIAN_SKILLS_DIR);
     const normalizedSkillDir = normalizePath(`${CEBIAN_SKILLS_DIR}/${skill}`);
     if (!normalizedSkillDir.startsWith(normalizedSkillsRoot + '/')) {
-      return {
-        content: [{ type: 'text', text: 'Error: invalid skill name — path traversal detected.' }],
-        details: { status: 'error' },
-      };
+      throw new Error('Invalid skill name — path traversal detected.');
     }
     const normalizedScriptPath = normalizePath(`${normalizedSkillDir}/${script}`);
     if (!normalizedScriptPath.startsWith(normalizedSkillDir + '/')) {
-      return {
-        content: [{ type: 'text', text: 'Error: script path escapes skill directory.' }],
-        details: { status: 'error' },
-      };
+      throw new Error('Script path escapes skill directory.');
     }
 
     // ─── ① Read SKILL.md and parse permissions ───
 
     const skillMdPath = `${normalizedSkillDir}/${SKILL_ENTRY_FILE}`;
 
-    try {
-      if (!(await vfs.exists(skillMdPath))) {
-        return {
-          content: [{ type: 'text', text: `Error: skill "${skill}" not found. No SKILL.md at ${skillMdPath}` }],
-          details: { status: 'error' },
-        };
-      }
-    } catch (err) {
-      return {
-        content: [{ type: 'text', text: `Error reading skill: ${(err as Error).message}` }],
-        details: { status: 'error' },
-      };
+    if (!(await vfs.exists(skillMdPath))) {
+      throw new Error(`Skill "${skill}" not found. No SKILL.md at ${skillMdPath}`);
     }
 
     let permissions: string[] = [];
+    const raw = await vfs.readFile(skillMdPath, 'utf8');
+    const content = typeof raw === 'string' ? raw : new TextDecoder().decode(raw as Uint8Array);
     try {
-      const raw = await vfs.readFile(skillMdPath, 'utf8');
-      const content = typeof raw === 'string' ? raw : new TextDecoder().decode(raw as Uint8Array);
       const { data } = parseFrontmatter(content);
       if (data.metadata && typeof data.metadata === 'object') {
         const meta = data.metadata as Record<string, unknown>;
@@ -108,30 +92,16 @@ export const runSkillTool: AgentTool<typeof RunSkillParameters> = {
         }
       }
     } catch (err) {
-      return {
-        content: [{ type: 'text', text: `Error parsing SKILL.md: ${(err as Error).message}` }],
-        details: { status: 'error' },
-      };
+      throw new Error(`Failed to parse SKILL.md: ${(err as Error).message}`);
     }
 
     // ─── ② Read script file ───
 
-    let code: string;
-    try {
-      if (!(await vfs.exists(normalizedScriptPath))) {
-        return {
-          content: [{ type: 'text', text: `Error: script not found: ${normalizedScriptPath}` }],
-          details: { status: 'error' },
-        };
-      }
-      const raw = await vfs.readFile(normalizedScriptPath, 'utf8');
-      code = typeof raw === 'string' ? raw : new TextDecoder().decode(raw as Uint8Array);
-    } catch (err) {
-      return {
-        content: [{ type: 'text', text: `Error reading script: ${(err as Error).message}` }],
-        details: { status: 'error' },
-      };
+    if (!(await vfs.exists(normalizedScriptPath))) {
+      throw new Error(`Script not found: ${normalizedScriptPath}`);
     }
+    const rawScript = await vfs.readFile(normalizedScriptPath, 'utf8');
+    const code = typeof rawScript === 'string' ? rawScript : new TextDecoder().decode(rawScript as Uint8Array);
 
     // ─── ③ Check permission grant ───
 
@@ -141,22 +111,20 @@ export const runSkillTool: AgentTool<typeof RunSkillParameters> = {
       const isGranted = grant?.granted === 'always' && permissionsMatch(grant.permissions, permissions);
 
       if (!isGranted) {
-        // Check if a valid nonce was provided (proves user confirmed via ask_user)
+        // 已经带了 nonce —— 校验是不是用户确认过的那次
         if (confirmation_nonce) {
           const nonceData = pendingNonces.get(confirmation_nonce);
           pendingNonces.delete(confirmation_nonce);
           if (!nonceData || nonceData.skill !== skill || nonceData.expiresAt < Date.now()) {
-            return {
-              content: [{ type: 'text', text: 'Error: invalid or expired confirmation nonce. Please retry the permission flow.' }],
-              details: { status: 'error' },
-            };
+            throw new Error('Invalid or expired confirmation nonce. Please retry the permission flow.');
           }
-          // Valid nonce — grant permission
+          // 合法 nonce —— 持久化授权
           if (always_allow) {
             await setSkillGrant(skill, permissions);
           }
         } else {
-          // Generate nonce and return permission prompt
+          // 没 nonce —— 生成一个并返回 permission prompt。这是正常的 next-step
+          // 返回，不是错误：agent 读到内容会去调 ask_user 然后再来一次。
           const nonce = crypto.randomUUID();
           pendingNonces.set(nonce, { skill, permissions, expiresAt: Date.now() + NONCE_TTL_MS });
           const permList = permissions.map((p) => `  • ${p}`).join('\n');
@@ -173,7 +141,7 @@ export const runSkillTool: AgentTool<typeof RunSkillParameters> = {
                 `If approved, call run_skill again with the same skill/script/args plus confirmation_nonce="${nonce}". ` +
                 `If "always allow", also set always_allow=true. If denied, do not call again.`,
             }],
-            details: { status: 'permission_required' },
+            details: {},
           };
         }
       }
@@ -183,19 +151,12 @@ export const runSkillTool: AgentTool<typeof RunSkillParameters> = {
 
     // ─── ④ Execute in sandbox ───
 
-    try {
-      const result = await runInSandbox(code, args as Record<string, unknown>, permissions, tabId);
-      const serialized = result !== undefined ? JSON.stringify(result, null, 2) : '(no return value)';
+    const result = await runInSandbox(code, args as Record<string, unknown>, permissions, tabId);
+    const serialized = result !== undefined ? JSON.stringify(result, null, 2) : '(no return value)';
 
-      return {
-        content: [{ type: 'text', text: serialized }],
-        details: { status: 'done' },
-      };
-    } catch (err) {
-      return {
-        content: [{ type: 'text', text: `Script execution error: ${(err as Error).message}` }],
-        details: { status: 'error' },
-      };
-    }
+    return {
+      content: [{ type: 'text', text: serialized }],
+      details: {},
+    };
   },
 };

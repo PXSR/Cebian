@@ -31,90 +31,79 @@ export const fsSearchTool: AgentTool<typeof FsSearchParameters> = {
     `Returns up to ${MAX_SEARCH_RESULTS} results.`,
   parameters: FsSearchParameters,
 
-  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
+  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{}>> {
     signal?.throwIfAborted();
     const searchRoot = params.path ?? '/';
 
-    try {
-      if (!(await vfs.exists(searchRoot))) {
+    if (!(await vfs.exists(searchRoot))) {
+      throw new Error(`Directory not found: ${searchRoot}`);
+    }
+
+    const allFiles = await walkDir(searchRoot, signal);
+
+    if (params.mode === 'name') {
+      const matches = allFiles
+        .filter(f => globMatch(params.pattern, f))
+        .slice(0, MAX_SEARCH_RESULTS);
+
+      if (matches.length === 0) {
+        // 0 命中是正常结果 —— pattern 是合法的，只是没匹配上
         return {
-          content: [{ type: 'text', text: `Error: directory not found: ${searchRoot}` }],
-          details: { status: 'error' },
+          content: [{ type: 'text', text: `No files matching "${params.pattern}" in ${searchRoot}` }],
+          details: {},
         };
       }
 
-      const allFiles = await walkDir(searchRoot, signal);
-
-      if (params.mode === 'name') {
-        const matches = allFiles
-          .filter(f => globMatch(params.pattern, f))
-          .slice(0, MAX_SEARCH_RESULTS);
-
-        if (matches.length === 0) {
-          return {
-            content: [{ type: 'text', text: `No files matching "${params.pattern}" in ${searchRoot}` }],
-            details: { status: 'done' },
-          };
-        }
-
-        const suffix = matches.length === MAX_SEARCH_RESULTS ? `\n(truncated at ${MAX_SEARCH_RESULTS} results)` : '';
-        return {
-          content: [{ type: 'text', text: matches.join('\n') + suffix }],
-          details: { status: 'done' },
-        };
-      }
-
-      // mode === 'content'
-      const flags = params.case_sensitive ? 'g' : 'gi';
-      let regex: RegExp;
-      try {
-        regex = new RegExp(params.pattern, flags);
-      } catch (e) {
-        return {
-          content: [{ type: 'text', text: `Error: invalid regex: ${(e as Error).message}` }],
-          details: { status: 'error' },
-        };
-      }
-
-      const results: string[] = [];
-      for (const filePath of allFiles) {
-        if (results.length >= MAX_SEARCH_RESULTS) break;
-        signal?.throwIfAborted();
-        try {
-          const raw = await vfs.readFile(filePath);
-          const data = raw instanceof Uint8Array ? raw : new TextEncoder().encode(raw as string);
-          if (isBinaryContent(data)) continue;
-          const content = new TextDecoder().decode(data);
-          const lines = content.split('\n');
-          for (let i = 0; i < lines.length; i++) {
-            if (results.length >= MAX_SEARCH_RESULTS) break;
-            regex.lastIndex = 0;
-            if (regex.test(lines[i])) {
-              results.push(`${filePath}:${i + 1}: ${lines[i].trim()}`);
-            }
-          }
-        } catch {
-          // skip unreadable files
-        }
-      }
-
-      if (results.length === 0) {
-        return {
-          content: [{ type: 'text', text: `No matches for /${params.pattern}/ in ${searchRoot}` }],
-          details: { status: 'done' },
-        };
-      }
-
-      const suffix = results.length === MAX_SEARCH_RESULTS ? `\n(truncated at ${MAX_SEARCH_RESULTS} results)` : '';
+      const suffix = matches.length === MAX_SEARCH_RESULTS ? `\n(truncated at ${MAX_SEARCH_RESULTS} results)` : '';
       return {
-        content: [{ type: 'text', text: results.join('\n') + suffix }],
-        details: { status: 'done' },
-      };
-    } catch (err) {
-      return {
-        content: [{ type: 'text', text: `Error: ${(err as Error).message}` }],
-        details: { status: 'error' },
+        content: [{ type: 'text', text: matches.join('\n') + suffix }],
+        details: {},
       };
     }
+
+    // mode === 'content'
+    const flags = params.case_sensitive ? 'g' : 'gi';
+    let regex: RegExp;
+    try {
+      regex = new RegExp(params.pattern, flags);
+    } catch (e) {
+      throw new Error(`Invalid regex: ${(e as Error).message}`);
+    }
+
+    const results: string[] = [];
+    for (const filePath of allFiles) {
+      if (results.length >= MAX_SEARCH_RESULTS) break;
+      signal?.throwIfAborted();
+      try {
+        const raw = await vfs.readFile(filePath);
+        const data = raw instanceof Uint8Array ? raw : new TextEncoder().encode(raw as string);
+        if (isBinaryContent(data)) continue;
+        const content = new TextDecoder().decode(data);
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (results.length >= MAX_SEARCH_RESULTS) break;
+          regex.lastIndex = 0;
+          if (regex.test(lines[i])) {
+            results.push(`${filePath}:${i + 1}: ${lines[i].trim()}`);
+          }
+        }
+      } catch {
+        // 跳过无法读取的文件（损坏 / 权限问题），不让单个坏文件中断整次搜索
+      }
+    }
+
+    if (results.length === 0) {
+      // 0 命中是正常结果
+      return {
+        content: [{ type: 'text', text: `No matches for /${params.pattern}/ in ${searchRoot}` }],
+        details: {},
+      };
+    }
+
+    const suffix = results.length === MAX_SEARCH_RESULTS ? `\n(truncated at ${MAX_SEARCH_RESULTS} results)` : '';
+    return {
+      content: [{ type: 'text', text: results.join('\n') + suffix }],
+      details: {},
+    };
   },
 };

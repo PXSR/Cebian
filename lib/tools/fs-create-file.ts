@@ -22,26 +22,16 @@ export const fsCreateFileTool: AgentTool<typeof FsCreateFileParameters> = {
     'or fs_delete then fs_create_file to overwrite.',
   parameters: FsCreateFileParameters,
 
-  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
+  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{}>> {
     signal?.throwIfAborted();
-    try {
-      if (await vfs.exists(params.path)) {
-        return {
-          content: [{ type: 'text', text: `Error: file already exists: ${params.path}. Use fs_edit_file to modify it.` }],
-          details: { status: 'error' },
-        };
-      }
-      await vfs.writeFile(params.path, params.content, 'utf8');
-      const byteLen = new TextEncoder().encode(params.content).length;
-      return {
-        content: [{ type: 'text', text: `Created ${params.path} (${byteLen} bytes)` }],
-        details: { status: 'done' },
-      };
-    } catch (err) {
-      return {
-        content: [{ type: 'text', text: `Error: ${(err as Error).message}` }],
-        details: { status: 'error' },
-      };
+    if (await vfs.exists(params.path)) {
+      throw new Error(`File already exists: ${params.path}. Use fs_edit_file to modify it, or fs_delete then fs_create_file to overwrite.`);
     }
+    await vfs.writeFile(params.path, params.content, 'utf8');
+    const byteLen = new TextEncoder().encode(params.content).length;
+    return {
+      content: [{ type: 'text', text: `Created ${params.path} (${byteLen} bytes)` }],
+      details: {},
+    };
   },
 };

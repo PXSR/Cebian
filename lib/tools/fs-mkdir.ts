@@ -18,19 +18,12 @@ export const fsMkdirTool: AgentTool<typeof FsMkdirParameters> = {
     'Succeeds silently if the directory already exists.',
   parameters: FsMkdirParameters,
 
-  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
+  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{}>> {
     signal?.throwIfAborted();
-    try {
-      await vfs.mkdir(params.path, { recursive: true });
-      return {
-        content: [{ type: 'text', text: `Created directory ${params.path}` }],
-        details: { status: 'done' },
-      };
-    } catch (err) {
-      return {
-        content: [{ type: 'text', text: `Error: ${(err as Error).message}` }],
-        details: { status: 'error' },
-      };
-    }
+    await vfs.mkdir(params.path, { recursive: true });
+    return {
+      content: [{ type: 'text', text: `Created directory ${params.path}` }],
+      details: {},
+    };
   },
 };

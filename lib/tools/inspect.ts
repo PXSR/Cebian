@@ -512,19 +512,12 @@ export const inspectTool: AgentTool<typeof InspectParameters> = {
     'Use `attrs: "verbose"` only when the default filter hides something you need (default mode strips aria-*, inline style, framework data-*, and Tailwind utility classes — that information is already in role/label/state).',
   parameters: InspectParameters,
 
-  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
+  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{}>> {
     signal?.throwIfAborted();
-    try {
-      const result = await executeInTabWithArgs(params.tabId, performInspect, [params], params.frameId);
-      return {
-        content: [{ type: 'text', text: result }],
-        details: { status: 'done' },
-      };
-    } catch (err) {
-      return {
-        content: [{ type: 'text', text: `Error: ${(err as Error).message}` }],
-        details: { status: 'error' },
-      };
-    }
+    const result = await executeInTabWithArgs(params.tabId, performInspect, [params], params.frameId);
+    return {
+      content: [{ type: 'text', text: result }],
+      details: {},
+    };
   },
 };

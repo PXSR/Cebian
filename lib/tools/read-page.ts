@@ -888,7 +888,7 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
     'Use this before answering questions about page content.',
   parameters: ReadPageParameters,
 
-  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
+  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{}>> {
     signal?.throwIfAborted();
     const tabId = params.tabId;
     const mode = params.mode ?? 'markdown';
@@ -905,7 +905,7 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
       if (isLikelyPdfUrl(tab.url)) {
         return {
           content: [{ type: 'text', text: pdfRedirectHint(tab.url, tabId) }],
-          details: { status: 'done' },
+          details: {},
         };
       }
     } catch {
@@ -961,14 +961,7 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
     // byte count + 1KB preview. maxLength is intentionally ignored — the
     // whole point of outputPath is to bypass the size limiter.
     if (params.outputPath) {
-      try {
-        await vfs.writeFile(params.outputPath, content, 'utf8');
-      } catch (err) {
-        return {
-          content: [{ type: 'text', text: `Error writing ${params.outputPath}: ${(err as Error).message}` }],
-          details: { status: 'error' },
-        };
-      }
+      await vfs.writeFile(params.outputPath, content, 'utf8');
 
       const byteLen = new TextEncoder().encode(content).length;
       const preview = content.length > 1024
@@ -976,13 +969,13 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
         : content;
       return {
         content: [{ type: 'text', text: `Wrote ${params.outputPath} (${byteLen} bytes, mode=${mode})\nPreview:\n---\n${preview}\n---` }],
-        details: { status: 'done' },
+        details: {},
       };
     }
 
     return {
       content: [{ type: 'text', text: truncate(content, maxLength) }],
-      details: { status: 'done' },
+      details: {},
     };
   },
 };

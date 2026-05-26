@@ -413,78 +413,58 @@ export const chromeApiTool: AgentTool<typeof ChromeApiParameters> = {
     'Returns the JSON-serialized result.',
   parameters: ChromeApiParameters,
 
-  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
+  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{}>> {
     signal?.throwIfAborted();
     const { namespace, method, args = [] } = params;
 
     // Handle help requests — return API documentation
     if (namespace === 'help') {
       if (method === 'list') {
-        return { content: [{ type: 'text', text: formatHelpList() }], details: { status: 'done' } };
+        return { content: [{ type: 'text', text: formatHelpList() }], details: {} };
       }
-      return { content: [{ type: 'text', text: formatHelpNamespace(method) }], details: { status: 'done' } };
+      return { content: [{ type: 'text', text: formatHelpNamespace(method) }], details: {} };
     }
 
     // Validate against whitelist
     if (!isChromeCallAllowed(namespace, method)) {
       const supported = Object.keys(CHROME_API_WHITELIST).join(', ');
-      return {
-        content: [{
-          type: 'text',
-          text: `Error: chrome.${namespace}.${method} is not allowed. Supported namespaces: ${supported}.`,
-        }],
-        details: { status: 'error' },
-      };
+      throw new Error(`chrome.${namespace}.${method} is not allowed. Supported namespaces: ${supported}.`);
     }
 
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic chrome API access
-      let target: any = (chrome as any)[namespace];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 动态 chrome.* 取值
+    let target: any = (chrome as any)[namespace];
+    if (!target) {
+      throw new Error(`chrome.${namespace} is not available in this environment.`);
+    }
+
+    // Resolve nested method path (e.g. storage → local → get)
+    const parts = method.split('.');
+    for (let i = 0; i < parts.length - 1; i++) {
+      target = target[parts[i]];
       if (!target) {
-        return {
-          content: [{ type: 'text', text: `Error: chrome.${namespace} is not available in this environment.` }],
-          details: { status: 'error' },
-        };
+        throw new Error(`chrome.${namespace}.${method} path not found.`);
       }
-
-      // Resolve nested method path (e.g. storage → local → get)
-      const parts = method.split('.');
-      for (let i = 0; i < parts.length - 1; i++) {
-        target = target[parts[i]];
-        if (!target) {
-          return {
-            content: [{ type: 'text', text: `Error: chrome.${namespace}.${method} path not found.` }],
-            details: { status: 'error' },
-          };
-        }
-      }
-
-      const finalMethod = parts[parts.length - 1];
-      if (typeof target[finalMethod] !== 'function') {
-        return {
-          content: [{ type: 'text', text: `Error: chrome.${namespace}.${method} is not a function.` }],
-          details: { status: 'error' },
-        };
-      }
-
-      const result = await target[finalMethod](...args);
-
-      let text: string;
-      try {
-        text = result !== undefined ? JSON.stringify(result, null, 2) : '(no return value)';
-      } catch {
-        text = `(result returned but could not be serialized — type: ${typeof result})`;
-      }
-
-      return {
-        content: [{ type: 'text', text }],
-        details: { status: 'done' },
-      };
-    } catch (err) {
-      return {
-        content: [{ type: 'text', text: `Error: ${(err as Error).message}` }],
-        details: { status: 'error' },
-      };
     }
+
+    const finalMethod = parts[parts.length - 1];
+    if (typeof target[finalMethod] !== 'function') {
+      throw new Error(`chrome.${namespace}.${method} is not a function.`);
+    }
+
+    const result = await target[finalMethod](...args);
+
+    let text: string;
+    try {
+      text = result !== undefined ? JSON.stringify(result, null, 2) : '(no return value)';
+    } catch {
+      // 序列化失败不算真错（chrome API 返回了，只是包含 circular ref / Symbol /
+      // class instance 之类）—— 告诉 agent 类型，让它换个方法或参数
+      text = `(result returned but could not be serialized — type: ${typeof result})`;
+    }
+
+    return {
+      content: [{ type: 'text', text }],
+      details: {},
+    };
   },
 };

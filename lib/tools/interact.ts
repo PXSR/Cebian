@@ -565,24 +565,17 @@ export const interactTool: AgentTool<typeof InteractParameters> = {
     'Elements are scrolled into view automatically before interaction.',
   parameters: InteractParameters,
 
-  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
+  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{}>> {
     signal?.throwIfAborted();
     const tabId = params.tabId;
 
     // wait_navigation runs in extension context (not in-page)
     if (params.action === 'wait_navigation') {
-      try {
-        const result = await waitForNavigation(tabId, params.timeout ?? 3000);
-        return {
-          content: [{ type: 'text', text: result }],
-          details: { status: 'done' },
-        };
-      } catch (err) {
-        return {
-          content: [{ type: 'text', text: `Error: ${(err as Error).message}` }],
-          details: { status: 'error' },
-        };
-      }
+      const result = await waitForNavigation(tabId, params.timeout ?? 3000);
+      return {
+        content: [{ type: 'text', text: result }],
+        details: {},
+      };
     }
 
     // sequence: run multiple steps in order, in-page
@@ -597,23 +590,14 @@ export const interactTool: AgentTool<typeof InteractParameters> = {
         try {
           steps = JSON.parse(steps);
         } catch {
-          return {
-            content: [{ type: 'text', text: 'Error: "steps" was passed as a string but is not valid JSON. Pass it as a JSON array of step objects, e.g. [{"action":"click","selector":"#btn"}].' }],
-            details: { status: 'error' },
-          };
+          throw new Error('"steps" was passed as a string but is not valid JSON. Pass it as a JSON array of step objects, e.g. [{"action":"click","selector":"#btn"}].');
         }
       }
       if (!Array.isArray(steps)) {
-        return {
-          content: [{ type: 'text', text: 'Error: "steps" must be a JSON array of step objects (received ' + typeof steps + ').' }],
-          details: { status: 'error' },
-        };
+        throw new Error(`"steps" must be a JSON array of step objects (received ${typeof steps}).`);
       }
       if (steps.length === 0) {
-        return {
-          content: [{ type: 'text', text: 'Error: "steps" array is required for sequence action.' }],
-          details: { status: 'error' },
-        };
+        throw new Error('"steps" array is required for sequence action.');
       }
 
       const frameId = params.frameId;
@@ -624,44 +608,57 @@ export const interactTool: AgentTool<typeof InteractParameters> = {
         const step = steps[i];
 
         try {
-          const result = await executeInTabWithArgs(tabId, performInteraction, [step], frameId);
+          const result = await runInPageStep(tabId, step, frameId);
           results.push(`[${i + 1}] ${result}`);
         } catch (err) {
+          // 中途失败：把已经跑过的 step 结果连同失败原因一起抛出，让 agent 看到全貌
           results.push(`[${i + 1}] Error: ${(err as Error).message}`);
-          return {
-            content: [{ type: 'text', text: `Sequence stopped at step ${i + 1}:\n${results.join('\n')}` }],
-            details: { status: 'error' },
-          };
+          throw new Error(`Sequence stopped at step ${i + 1}:\n${results.join('\n')}`);
         }
       }
 
       return {
         content: [{ type: 'text', text: `Sequence completed (${steps.length} steps):\n${results.join('\n')}` }],
-        details: { status: 'done' },
+        details: {},
       };
     }
 
     // All other actions run in-page
-    const frameId = params.frameId;
-    let result: string | undefined;
-    try {
-      result = await executeInTabWithArgs(tabId, performInteraction, [params], frameId);
-    } catch (err) {
-      // Re-throw so the agent runtime marks the tool result as isError=true (UI ✗).
-      throw new Error(`Error: ${(err as Error).message}`);
-    }
-    // The injected function reports its own failures as a string starting with "Error:"
-    // (we can't reject — chrome.scripting silently swallows rejections from injected funcs,
-    // surfacing them as `undefined`). Throw here so the runtime flags isError=true.
-    if (result === undefined) {
-      throw new Error('Error: in-page execution returned no result (likely an uncaught exception).');
-    }
-    if (typeof result === 'string' && result.startsWith('Error:')) {
-      throw new Error(result);
-    }
+    const result = await runInPageStep(tabId, params, params.frameId);
     return {
       content: [{ type: 'text', text: result }],
-      details: { status: 'done' },
+      details: {},
     };
   },
 };
+
+/**
+ * 在目标 tab 跑一次 in-page interaction，并把 chrome.scripting 的两种
+ * 静默失败通道转成真正的 throw：
+ *
+ * 1. 注入函数 `throw new Error(...)` → chrome.scripting 吞掉 rejection，
+ *    `executeInTabWithArgs` 返回 `undefined`。
+ * 2. 注入函数返回 `"Error: <msg>"` sentinel 字符串（`performInteraction`
+ *    在内部 catch 后采用这种方式上报，因为 reject 会被吞）。
+ *
+ * 两者都让上层看到真的异常，pi-agent-core 会把 `isError: true` 设到
+ * 这次 tool call 的结果上。
+ */
+async function runInPageStep(
+  tabId: number,
+  step: unknown,
+  frameId?: number,
+): Promise<string> {
+  // `performInteraction` 自身校验 step.action，并对未知 / 缺参情况返回
+  // 带 "Error:" 前缀的字符串 sentinel；这里直接转交，下面统一处理。
+  const result = await executeInTabWithArgs(tabId, performInteraction, [step as Parameters<typeof performInteraction>[0]], frameId);
+  const action = (step as { action?: string })?.action ?? 'unknown';
+  if (result === undefined) {
+    throw new Error(`in-page execution of "${action}" returned no result (likely an uncaught exception in the page).`);
+  }
+  if (typeof result === 'string' && result.startsWith('Error:')) {
+    // 去掉 in-page sentinel 前缀，isError 现在承担信号责任
+    throw new Error(result.slice('Error:'.length).trim());
+  }
+  return result as string;
+}

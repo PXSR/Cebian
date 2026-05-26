@@ -20,25 +20,15 @@ export const fsDeleteTool: AgentTool<typeof FsDeleteParameters> = {
     'For non-empty directories, set recursive to true.',
   parameters: FsDeleteParameters,
 
-  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
+  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{}>> {
     signal?.throwIfAborted();
-    try {
-      if (!(await vfs.exists(params.path))) {
-        return {
-          content: [{ type: 'text', text: `Error: path not found: ${params.path}` }],
-          details: { status: 'error' },
-        };
-      }
-      await vfs.rm(params.path, { recursive: params.recursive ?? false, force: false });
-      return {
-        content: [{ type: 'text', text: `Deleted ${params.path}` }],
-        details: { status: 'done' },
-      };
-    } catch (err) {
-      return {
-        content: [{ type: 'text', text: `Error: ${(err as Error).message}` }],
-        details: { status: 'error' },
-      };
+    if (!(await vfs.exists(params.path))) {
+      throw new Error(`Path not found: ${params.path}`);
     }
+    await vfs.rm(params.path, { recursive: params.recursive ?? false, force: false });
+    return {
+      content: [{ type: 'text', text: `Deleted ${params.path}` }],
+      details: {},
+    };
   },
 };

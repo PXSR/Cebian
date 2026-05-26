@@ -18,56 +18,44 @@ export const fsListTool: AgentTool<typeof FsListParameters> = {
     'Shows entry names, types (file/directory), and sizes.',
   parameters: FsListParameters,
 
-  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
+  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{}>> {
     signal?.throwIfAborted();
-    try {
-      if (!(await vfs.exists(params.path))) {
-        return {
-          content: [{ type: 'text', text: `Error: path not found: ${params.path}` }],
-          details: { status: 'error' },
-        };
-      }
+    if (!(await vfs.exists(params.path))) {
+      throw new Error(`Path not found: ${params.path}`);
+    }
 
-      const info = await vfs.stat(params.path);
-      if (!info.isDirectory()) {
-        return {
-          content: [{ type: 'text', text: `Error: ${params.path} is not a directory` }],
-          details: { status: 'error' },
-        };
-      }
+    const info = await vfs.stat(params.path);
+    if (!info.isDirectory()) {
+      throw new Error(`${params.path} is not a directory`);
+    }
 
-      const entries = await vfs.readdir(params.path);
-      if (entries.length === 0) {
-        return {
-          content: [{ type: 'text', text: `${params.path} (empty directory)` }],
-          details: { status: 'done' },
-        };
-      }
-
-      const lines: string[] = [];
-      for (const name of entries.sort()) {
-        const fullPath = params.path === '/' ? `/${name}` : `${params.path}/${name}`;
-        try {
-          const info = await vfs.stat(fullPath);
-          if (info.isDirectory()) {
-            lines.push(`${name}/`);
-          } else {
-            lines.push(`${name}  (${formatSize(info.size)})`);
-          }
-        } catch {
-          lines.push(`${name}  (inaccessible)`);
-        }
-      }
-
+    const entries = await vfs.readdir(params.path);
+    if (entries.length === 0) {
+      // 空目录是正常结果，不是错误 —— agent 可以基于这个继续动作
       return {
-        content: [{ type: 'text', text: `${params.path}\n${lines.join('\n')}` }],
-        details: { status: 'done' },
-      };
-    } catch (err) {
-      return {
-        content: [{ type: 'text', text: `Error: ${(err as Error).message}` }],
-        details: { status: 'error' },
+        content: [{ type: 'text', text: `${params.path} (empty directory)` }],
+        details: {},
       };
     }
+
+    const lines: string[] = [];
+    for (const name of entries.sort()) {
+      const fullPath = params.path === '/' ? `/${name}` : `${params.path}/${name}`;
+      try {
+        const info = await vfs.stat(fullPath);
+        if (info.isDirectory()) {
+          lines.push(`${name}/`);
+        } else {
+          lines.push(`${name}  (${formatSize(info.size)})`);
+        }
+      } catch {
+        lines.push(`${name}  (inaccessible)`);
+      }
+    }
+
+    return {
+      content: [{ type: 'text', text: `${params.path}\n${lines.join('\n')}` }],
+      details: {},
+    };
   },
 };

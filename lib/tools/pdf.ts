@@ -159,59 +159,52 @@ export const pdfTool: AgentTool<typeof PdfParameters> = {
     'blob: URLs), the error message will surface the actual fetch failure.',
   parameters: PdfParameters,
 
-  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
+  async execute(_toolCallId, params, signal): Promise<AgentToolResult<{}>> {
     signal?.throwIfAborted();
+    // ── Resolve tab → URL ──
+    const tab = await chrome.tabs.get(params.tabId);
+    const url = tab.url;
+    if (!url) {
+      throw new Error(
+        `Tab ${params.tabId} has no URL accessible to the extension ` +
+        '(restricted pages like chrome://, the Web Store, or new-tab pages cannot be read).',
+      );
+    }
+
+    // URL 可 parse 校验。不再白名单协议 —— fetch 出问题了自己报错就行，
+    // 与其在工具层猜测哪些协议能 / 不能工作不如让浏览器说实话。
     try {
-      // ── Resolve tab → URL ──
-      const tab = await chrome.tabs.get(params.tabId);
-      const url = tab.url;
-      if (!url) {
-        return errorResult(
-          `Tab ${params.tabId} has no URL accessible to the extension ` +
-          '(restricted pages like chrome://, the Web Store, or new-tab pages cannot be read).',
-        );
-      }
+      new URL(url);
+    } catch {
+      throw new Error(`Tab URL is not a valid URL: ${url}`);
+    }
 
-      // URL 可 parse 校验。不再白名单协议 —— fetch 出问题了自己报错就行，
-      // 与其在工具层猜测哪些协议能 / 不能工作不如让浏览器说实话。
-      try {
-        new URL(url);
-      } catch {
-        return errorResult(`Tab URL is not a valid URL: ${url}`);
-      }
+    await ensureOffscreen();
+    signal?.throwIfAborted();
 
-      await ensureOffscreen();
-      signal?.throwIfAborted();
-
-      switch (params.action) {
-        case 'info':
-          return await runInfo(url);
-        case 'read':
-          return await runRead(url, params, signal);
-        case 'search':
-          return await runSearch(url, params, signal);
-        default:
-          return errorResult(`Unknown action: ${(params as { action?: string }).action}`);
-      }
-    } catch (err) {
-      // Let AbortError bubble up to pi-agent-core's cancellation contract —
-      // matches the fs-save-url pattern. Other failures collapse to errorResult.
-      if ((err as Error).name === 'AbortError' || signal?.aborted) throw err;
-      return errorResult((err as Error).message || String(err));
+    switch (params.action) {
+      case 'info':
+        return await runInfo(url);
+      case 'read':
+        return await runRead(url, params, signal);
+      case 'search':
+        return await runSearch(url, params, signal);
+      default:
+        throw new Error(`Unknown action: ${(params as { action?: string }).action}`);
     }
   },
 };
 
 // ─── Action handlers ───
 
-async function runInfo(url: string): Promise<AgentToolResult<{ status: string }>> {
+async function runInfo(url: string): Promise<AgentToolResult<{}>> {
   const req: OffscreenRequest = { type: 'pdf-info', url };
   const resp = await sendOffscreenWithTimeout<OffscreenPdfInfoResponse>(req);
-  if (resp.error) return errorResult(resp.error);
-  if (!resp.result) return errorResult('PDF info handler returned no result.');
+  if (resp.error) throw new Error(resp.error);
+  if (!resp.result) throw new Error('PDF info handler returned no result.');
   return {
     content: [{ type: 'text', text: formatInfo(resp.result) }],
-    details: { status: 'done' },
+    details: {},
   };
 }
 
@@ -219,7 +212,7 @@ async function runRead(
   url: string,
   params: PdfToolParams,
   signal: AbortSignal | undefined,
-): Promise<AgentToolResult<{ status: string }>> {
+): Promise<AgentToolResult<{}>> {
   const usingOutputPath = !!params.outputPath;
   const maxLength = params.maxLength ?? DEFAULT_MAX_LENGTH;
 
@@ -236,19 +229,15 @@ async function runRead(
     maxChars: offscreenMaxChars,
   };
   const resp = await sendOffscreenWithTimeout<OffscreenPdfTextResponse>(req);
-  if (resp.error) return errorResult(resp.error);
-  if (!resp.result) return errorResult('PDF text handler returned no result.');
+  if (resp.error) throw new Error(resp.error);
+  if (!resp.result) throw new Error('PDF text handler returned no result.');
   signal?.throwIfAborted();
 
   const { text, pages, truncated } = resp.result;
 
   // ── outputPath branch ──
   if (params.outputPath) {
-    try {
-      await vfs.writeFile(params.outputPath, text, 'utf8');
-    } catch (err) {
-      return errorResult(`Failed to write ${params.outputPath}: ${(err as Error).message}`);
-    }
+    await vfs.writeFile(params.outputPath, text, 'utf8');
     const byteLen = new TextEncoder().encode(text).length;
     const preview = text.length > 1024
       ? text.slice(0, 1024) + '\n…(preview truncated; full content is on disk)'
@@ -261,7 +250,7 @@ async function runRead(
           `Wrote ${params.outputPath} (${byteLen} bytes, ${pageSummary}).\n` +
           `Preview:\n---\n${preview}\n---`,
       }],
-      details: { status: 'done' },
+      details: {},
     };
   }
 
@@ -271,7 +260,7 @@ async function runRead(
     : text;
   return {
     content: [{ type: 'text', text: body }],
-    details: { status: 'done' },
+    details: {},
   };
 }
 
@@ -279,9 +268,9 @@ async function runSearch(
   url: string,
   params: PdfToolParams,
   signal: AbortSignal | undefined,
-): Promise<AgentToolResult<{ status: string }>> {
+): Promise<AgentToolResult<{}>> {
   if (!params.query || !params.query.trim()) {
-    return errorResult('Search requires a non-empty `query`.');
+    throw new Error('Search requires a non-empty `query`.');
   }
   const req: OffscreenRequest = {
     type: 'pdf-search',
@@ -293,12 +282,12 @@ async function runSearch(
     maxHits: params.maxHits,
   };
   const resp = await sendOffscreenWithTimeout<OffscreenPdfSearchResponse>(req);
-  if (resp.error) return errorResult(resp.error);
-  if (!resp.result) return errorResult('PDF search handler returned no result.');
+  if (resp.error) throw new Error(resp.error);
+  if (!resp.result) throw new Error('PDF search handler returned no result.');
   signal?.throwIfAborted();
   return {
     content: [{ type: 'text', text: formatSearch(params.query, resp.result) }],
-    details: { status: 'done' },
+    details: {},
   };
 }
 
@@ -406,13 +395,4 @@ async function sendOffscreenWithTimeout<R extends { result?: unknown; error?: st
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }
-}
-
-// ─── Error helper ───
-
-function errorResult(message: string): AgentToolResult<{ status: string }> {
-  return {
-    content: [{ type: 'text', text: `Error: ${message}` }],
-    details: { status: 'error' },
-  };
 }
