@@ -4,7 +4,7 @@
  * Chrome API calls are proxied back to the background via postMessage → offscreen → background.
  */
 
-import { encodeBinaryArgs, decodeBinary } from '@/lib/sandbox-binary';
+import { encodeBinary, encodeBinaryArgs, decodeBinary } from '@/lib/sandbox-binary';
 
 // ─── Message types (shared with sandbox-rpc.ts) ───
 
@@ -74,6 +74,32 @@ interface VfsResponse {
   id: string;
   callId: string;
   result?: unknown;
+  error?: string;
+}
+
+interface BgFetchCall {
+  type: 'sandbox:bg_fetch';
+  id: string;
+  callId: string;
+  url: string;
+  init: unknown;
+}
+
+interface RawBgFetchResponseFromBg {
+  status: number;
+  statusText: string;
+  redirected: boolean;
+  url: string;
+  headersFlat: Record<string, string>;
+  /** binary envelope —— sandbox dispatcher 接收时会先 decodeBinary 还原成 Uint8Array */
+  body: unknown;
+}
+
+interface BgFetchResponseMsg {
+  type: 'sandbox:bg_fetch_result';
+  id: string;
+  callId: string;
+  result?: RawBgFetchResponseFromBg;
   error?: string;
 }
 
@@ -162,8 +188,8 @@ function createVfsProxy(
   const hasWrite = permissions.includes('vfs.write');
   if (!hasRead && !hasWrite) return undefined;
   // sandbox-rpc 一侧保证：声明了任一 vfs 权限 → vfsRoot 必有值。
-  // 跑到这里还是 null 说明上游 wiring 坏了，比起静默返回 undefined 让 skill
-  // 拿到 "vfs is undefined" 的迷糊错，宁愿在 sandbox 启动时直接炸出来。
+  // 走到这里还是 null 说明上游 wiring 坏了，与其静默返回 undefined
+  // 让 skill 拿到含糊的 "vfs is undefined"，不如在 sandbox 启动时直接报错。
   if (!vfsRoot) {
     throw new Error('internal: vfs permission declared but vfsRoot missing (sandbox-rpc bug)');
   }
@@ -191,6 +217,114 @@ function createVfsProxy(
       };
     },
   });
+}
+
+// ─── bgFetch (background fetch) proxy ───
+// 让 skill 通过 background SW 发请求，绕开 sandbox iframe 的 opaque origin
+// 与 CORS 限制。接口形状跟原生 `fetch` 尽量贴合：返回值是带 `text()` /
+// `json()` / `arrayBuffer()` / `bytes()` / `blob()` 方法、`Headers` 实例的
+// fetch-like Response。
+//
+// 仅在声明了任一 `bgFetch` / `bgFetch:<pattern>` 权限时暴露；URL 是否命中
+// pattern 由 background 一侧权威校验，sandbox 无法绕过。
+
+/** Sandbox 拿到 skill 写的 `init`，按 fetch RequestInit 子集 normalize 后发出去。
+ *  - headers: Headers 实例 → 迭代 flatten 成 Record<string,string>；plain object 透传
+ *  - body: Uint8Array / ArrayBuffer 走 encodeBinary 进 base64 envelope；string 透传
+ *    其它二进制视图（Int8Array / DataView 等）也由 encodeBinary 兜底处理 */
+function normalizeBgFetchInit(init: unknown): unknown {
+  if (!init || typeof init !== 'object') return undefined;
+  const i = init as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  if (typeof i.method === 'string') out.method = i.method;
+  if (i.headers !== undefined) {
+    if (typeof Headers !== 'undefined' && i.headers instanceof Headers) {
+      const flat: Record<string, string> = {};
+      i.headers.forEach((v, k) => { flat[k] = v; });
+      out.headers = flat;
+    } else if (typeof i.headers === 'object') {
+      out.headers = i.headers;
+    }
+  }
+  if (i.body !== undefined) out.body = encodeBinary(i.body);
+  if (i.redirect) out.redirect = i.redirect;
+  if (typeof i.referrer === 'string') out.referrer = i.referrer;
+  if (i.referrerPolicy) out.referrerPolicy = i.referrerPolicy;
+  if (i.cache) out.cache = i.cache;
+  return out;
+}
+
+/** Skill 看到的 fetch-like Response。`body` 已经在边界处还原成 Uint8Array，
+ *  reader 方法都是 sync-delivered Promise；不实现 `bodyUsed` consume-once
+ *  语义 —— 数据已 buffered，多次 `text()` / `json()` 没风险。 */
+interface BgFetchResponseShape {
+  readonly status: number;
+  readonly statusText: string;
+  readonly ok: boolean;
+  readonly redirected: boolean;
+  readonly url: string;
+  readonly headers: Headers;
+  text(): Promise<string>;
+  json(): Promise<unknown>;
+  arrayBuffer(): Promise<ArrayBuffer>;
+  bytes(): Promise<Uint8Array>;
+  blob(): Promise<Blob>;
+}
+
+function buildBgFetchResponse(raw: RawBgFetchResponseFromBg): BgFetchResponseShape {
+  // body 已经在 dispatcher 那里 decodeBinary 还原成 Uint8Array。
+  const bytes = raw.body as Uint8Array;
+  const headers = new Headers(raw.headersFlat);
+  const contentType = headers.get('content-type') ?? '';
+  return {
+    status: raw.status,
+    statusText: raw.statusText,
+    ok: raw.status >= 200 && raw.status < 300,
+    redirected: raw.redirected,
+    url: raw.url,
+    headers,
+    async text() { return new TextDecoder().decode(bytes); },
+    async json() { return JSON.parse(new TextDecoder().decode(bytes)); },
+    async arrayBuffer() {
+      // 返回独立的 ArrayBuffer 拷贝，避免 skill 拿到的 buffer 跟内部 Uint8Array
+      // 共享底层、修改其一污染另一处。
+      const ab = new ArrayBuffer(bytes.byteLength);
+      new Uint8Array(ab).set(bytes);
+      return ab;
+    },
+    async bytes() { return bytes; },
+    async blob() {
+      // `Uint8Array<ArrayBufferLike>` 在严格 TS 配置下不直接满足 `BlobPart`
+      // （会包含 SharedArrayBuffer），加一道 cast。运行期没问题 —— 这里只可能
+      // 是 ArrayBuffer-backed Uint8Array。
+      return new Blob([bytes as BlobPart], { type: contentType });
+    },
+  };
+}
+
+function createBgFetch(
+  permissions: string[],
+  requestId: string,
+): ((url: string, init?: unknown) => Promise<BgFetchResponseShape>) | undefined {
+  const hasBgFetch = permissions.some(p => p === 'bgFetch' || p.startsWith('bgFetch:'));
+  if (!hasBgFetch) return undefined;
+
+  return (url: string, init?: unknown): Promise<BgFetchResponseShape> => {
+    const callId = crypto.randomUUID();
+    return new Promise<BgFetchResponseShape>((resolve, reject) => {
+      pendingCalls.set(callId, {
+        resolve: (raw) => resolve(buildBgFetchResponse(raw as RawBgFetchResponseFromBg)),
+        reject,
+      });
+      window.parent.postMessage({
+        type: 'sandbox:bg_fetch',
+        id: requestId,
+        callId,
+        url,
+        init: normalizeBgFetchInit(init),
+      } satisfies BgFetchCall, '*');
+    });
+  };
 }
 
 // ─── Script Execution ───
@@ -231,6 +365,12 @@ async function executeScript(req: RunRequest): Promise<unknown> {
   const vfsProxy = createVfsProxy(permissions, vfsRoot, req.id);
   if (vfsProxy) {
     globals.vfs = vfsProxy;
+  }
+
+  // bgFetch (if any bgFetch / bgFetch:<pattern> permission declared)
+  const bgFetch = createBgFetch(permissions, req.id);
+  if (bgFetch) {
+    globals.bgFetch = bgFetch;
   }
 
   // Build and execute using new Function (allowed in sandbox CSP)
@@ -320,6 +460,33 @@ window.addEventListener('message', async (event) => {
           // readFile 的二进制返回也是从 background 经 JSON 通道过来，
           // 这里反向解包还原成 Uint8Array。
           pending.resolve(decodeBinary(resp.result));
+        }
+      }
+      break;
+    }
+
+    case 'sandbox:bg_fetch_result': {
+      const resp = msg as BgFetchResponseMsg;
+      const pending = pendingCalls.get(resp.callId);
+      if (pending) {
+        pendingCalls.delete(resp.callId);
+        if (resp.error) {
+          pending.reject(new Error(resp.error));
+        } else if (resp.result) {
+          // body 是 binary envelope，先解包再原样交给 createBgFetch 的 resolve
+          // 包装成 fetch-like Response。
+          const raw = resp.result;
+          const decoded: RawBgFetchResponseFromBg = {
+            status: raw.status,
+            statusText: raw.statusText,
+            redirected: raw.redirected,
+            url: raw.url,
+            headersFlat: raw.headersFlat,
+            body: decodeBinary(raw.body),
+          };
+          pending.resolve(decoded);
+        } else {
+          pending.reject(new Error('bg_fetch_result missing both result and error'));
         }
       }
       break;

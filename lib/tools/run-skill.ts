@@ -47,7 +47,9 @@ export const runSkillTool: AgentTool<typeof RunSkillParameters> = {
     'to run JavaScript in a browser tab via CDP and return the result. ' +
     'If the skill declares "vfs.read" or "vfs.write", a `vfs` global is available with readFile/writeFile/mkdir/readdir/stat/exists/unlink methods. ' +
     'All vfs paths are relative to the skill\'s session workspace (`/workspaces/<sessionId>/<skillName>/`); the absolute root is also exposed as the read-only `vfs.cwd` string for constructing markdown links like `![file](#${vfs.cwd}/out.png)`. ' +
+    '`vfs.write` automatically grants read-class methods too (stat / readFile / readdir / exists) — declaring only `vfs.write` is enough for skills that both produce and inspect their own output. ' +
     'NOTE: `vfs.stat` returns `{size, mtimeMs, isFile, isDirectory}` where `isFile`/`isDirectory` are booleans (not methods, unlike Node fs.Stats). Blobs/Files cannot cross the RPC boundary — convert with `new Uint8Array(await blob.arrayBuffer())` before passing to `vfs.writeFile`. ' +
+    'If the skill declares "bgFetch" (or `bgFetch:<match-pattern>`), a `bgFetch(url, init?)` global is available with the same shape as native `fetch`. Requests run in the background SW with the extension\'s host_permissions, bypassing CORS. The response object has `.status` / `.ok` / `.headers` (Headers instance) / `.text()` / `.json()` / `.arrayBuffer()` / `.bytes()` / `.blob()` — same surface as native Response. Patterns use Chrome match-pattern syntax: bare `bgFetch` allows any http(s) URL (= `*://*/*`); `bgFetch:https://api.example.com/*` scopes to one host. ' +
     'The script runs as a complete JavaScript file — use `module.exports = value` to set the return value. ' +
     'Arguments are accessible via the `args` variable. Returns JSON-serialized result.\n\n' +
     'PERMISSION FLOW: On first call, if the skill has not been granted permission, ' +

@@ -9,20 +9,27 @@ import { executeViaDebugger } from '@/lib/tab-helpers';
 import { isChromeCallAllowed } from './chrome-api-whitelist';
 import { vfs } from '@/lib/vfs';
 import { isVfsCallAllowed, resolveScopedPath, sessionSkillRoot } from './vfs-whitelist';
-import { decodeBinaryArgs, encodeBinary } from '@/lib/sandbox-binary';
+import { decodeBinaryArgs, decodeBinary, encodeBinary } from '@/lib/sandbox-binary';
+import type { MatchPattern } from './url-pattern';
+import { parseBgFetchPatterns } from './url-pattern';
+import { handleBgFetch } from './bg-fetch';
 
 // ─── Pending run requests ───
 
-/** Per-run state. `vfsRoot` / `permissions` are kept on the trusted side
- *  so that `handleVfsCall` looks them up by `id` instead of trusting the
- *  sandbox-supplied envelope — a malicious skill cannot forge its scope
- *  or claim a permission it wasn't granted. */
+/** Per-run state. `vfsRoot` / `permissions` / `bgFetchPatterns` are kept on
+ *  the trusted side so handlers look them up by `id` instead of trusting
+ *  the sandbox-supplied envelope — a malicious skill cannot forge its scope
+ *  or claim a permission / pattern it wasn't granted. */
 interface PendingRun {
   resolve: (result: unknown) => void;
   reject: (error: Error) => void;
   timeoutId: ReturnType<typeof setTimeout>;
   vfsRoot: string | null;
   permissions: string[];
+  bgFetchPatterns: MatchPattern[] | null;
+  /** AbortController for in-flight bgFetch calls; aborted when the run
+   *  times out or otherwise tears down. */
+  abortCtrl: AbortController;
 }
 
 const pendingRuns = new Map<string, PendingRun>();
@@ -38,6 +45,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (pending) {
         clearTimeout(pending.timeoutId);
         pendingRuns.delete(message.id);
+        // run 结束时一并 abort，中断 skill 中未 await 的 bgFetch。
+        // 脚本已经返回，这些悬空 Promise 拿不到任何结果，强制拆除可以省下它们占用的网络和内存。
+        pending.abortCtrl.abort();
         if (message.error) {
           pending.reject(new Error(message.error));
         } else {
@@ -59,6 +69,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     case 'sandbox:vfs_call': {
       handleVfsCall(message).catch(err => console.error('[sandbox-rpc] vfs_call error:', err));
+      return false;
+    }
+
+    case 'sandbox:bg_fetch': {
+      handleBgFetchCall(message).catch(err => console.error('[sandbox-rpc] bg_fetch error:', err));
       return false;
     }
   }
@@ -126,8 +141,8 @@ async function handlePageExec(msg: {
 
 // ─── VFS proxy handler ───
 // 把 skill 脚本里 `vfs.<method>(rel, ...)` 路由到真正的 lib/vfs。所有路径
-// 走 resolveScopedPath 限定在该 run 的 vfsRoot 内（由 run-skill 启动时
-// 算定 + pendingRuns 里持有），sandbox 自己不能影响作用域。
+// 过 resolveScopedPath 限定在该 run 的 vfsRoot 内（由 run-skill 启动时计算好
+// 并保存在 pendingRuns 里），sandbox 自己无法影响作用域。
 // `stat` 的返回值带方法，结构化克隆会丢，需要 flatten 成纯对象。
 async function handleVfsCall(msg: {
   id: string;
@@ -241,6 +256,68 @@ async function handleVfsCall(msg: {
   }).catch(() => {});
 }
 
+// ─── bgFetch handler ───
+// 路由到 lib/tools/bg-fetch.ts；patterns / abort signal 都从 pendingRuns 反查，
+// sandbox envelope 里的字段只是数据载体，不参与权限决策。
+
+async function handleBgFetchCall(msg: {
+  id: string;
+  callId: string;
+  url: unknown;
+  init: unknown;
+}): Promise<void> {
+  let result: unknown;
+  let error: string | undefined;
+
+  try {
+    const pending = pendingRuns.get(msg.id);
+    if (!pending) {
+      throw new Error('bgFetch call has no matching pending run (timed out or replayed)');
+    }
+    if (!pending.bgFetchPatterns) {
+      // 不可达：sandbox 未声明 bgFetch 时根本不构造 bgFetch global。
+      throw new Error('internal: bgFetch call received without patterns (sandbox-rpc / offscreen relay tampering)');
+    }
+
+    // init.body 可能是 binary envelope，先解包再交给 handler；这里解包整个 init
+    // 顶层字段（headers / body 等），但只有 body 真的会带 binary。
+    let normalizedInit: unknown = msg.init;
+    if (msg.init && typeof msg.init === 'object') {
+      const src = msg.init as Record<string, unknown>;
+      if (src.body !== undefined) {
+        normalizedInit = { ...src, body: decodeBinary(src.body) };
+      }
+    }
+
+    const raw = await handleBgFetch(
+      msg.url,
+      normalizedInit,
+      pending.bgFetchPatterns,
+      pending.abortCtrl.signal,
+    );
+
+    // body 反向再走 binary envelope 才能过 chrome.runtime.sendMessage 这一跳。
+    result = {
+      status: raw.status,
+      statusText: raw.statusText,
+      redirected: raw.redirected,
+      url: raw.url,
+      headersFlat: raw.headersFlat,
+      body: encodeBinary(raw.body),
+    };
+  } catch (err) {
+    error = (err as Error).message;
+  }
+
+  await chrome.runtime.sendMessage({
+    type: 'sandbox:bg_fetch_result',
+    id: msg.id,
+    callId: msg.callId,
+    result,
+    error,
+  }).catch(() => {});
+}
+
 // ─── Public API ───
 
 const SANDBOX_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
@@ -250,8 +327,11 @@ const SANDBOX_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
  * Manages the full lifecycle: ensure offscreen → send to sandbox → await result.
  *
  * `skill` + `sessionId` 由 run-skill.ts 注入。如果 permissions 含 vfs.* 任一档，
- * 这里一次性算出该 run 的 `vfsRoot`，存到 pendingRuns 里给 `handleVfsCall`
- * 反查 —— sandbox 自己不持有/不能伪造作用域。
+ * 这里一次性算出该 run 的 `vfsRoot`；含 bgFetch 任一档则解析 patterns。
+ * 二者都存进 pendingRuns 给对应 handler 反查 —— sandbox 自己不持有/不能伪造作用域。
+ *
+ * Pattern 解析失败时**立即抛错**（不等 skill 第一次调用 bgFetch），让权限声明
+ * 的 typo 在 run_skill 启动时就暴露。
  */
 export async function runInSandbox(
   code: string,
@@ -271,15 +351,23 @@ export async function runInSandbox(
   const wantsVfs = permissions.includes('vfs.read') || permissions.includes('vfs.write');
   const vfsRoot = wantsVfs ? sessionSkillRoot(sessionId, skill) : null;
 
+  // 同理：解析 bgFetch patterns；malformed pattern 立即抛。
+  const bgFetchPatterns = parseBgFetchPatterns(permissions);
+
+  const abortCtrl = new AbortController();
   const resultPromise = new Promise<unknown>((resolve, reject) => {
     const timeoutId = setTimeout(() => {
       if (pendingRuns.has(id)) {
         pendingRuns.delete(id);
+        abortCtrl.abort(new Error('Sandbox execution timed out (5 min)'));
         reject(new Error('Sandbox execution timed out (5 min)'));
       }
     }, SANDBOX_TIMEOUT_MS);
 
-    pendingRuns.set(id, { resolve, reject, timeoutId, vfsRoot, permissions });
+    pendingRuns.set(id, {
+      resolve, reject, timeoutId,
+      vfsRoot, permissions, bgFetchPatterns, abortCtrl,
+    });
   });
 
   // Send to offscreen (which relays to sandbox iframe)

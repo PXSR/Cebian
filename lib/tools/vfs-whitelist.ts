@@ -96,17 +96,22 @@ export function sessionSkillRoot(sessionId: string, skill: string): string {
  * Check whether a vfs method call is allowed for the given permission set.
  * Blocks prototype pollution attempts (`__proto__`, `constructor`, ...) and
  * enforces flat method names (no dots).
+ *
+ * 权限语义：
+ * - `vfs.read` 单独存在：仅允许读类方法（readFile / readdir / stat / exists）
+ * - `vfs.write` 存在：允许全部方法，**自动包含读类**。
+ *   理由：skill 已经能在自己的 `.data/` 子目录里任意写文件，再禁止它读
+ *   自己刚写的东西没有意义，只会逼用户两条权限都写一遍。作用域本身已经
+ *   是隐私边界，读写细分在 scope 内部没有保护价值。
  */
 export function isVfsCallAllowed(method: string, permissions: string[]): boolean {
   if (typeof method !== 'string') return false;
   if (FORBIDDEN_PARTS.has(method)) return false;
   if (method.includes('.')) return false;
-  if (VFS_READ_METHODS.has(method)) {
-    return permissions.includes(VFS_PERM_READ);
-  }
-  if (VFS_WRITE_METHODS.has(method)) {
-    return permissions.includes(VFS_PERM_WRITE);
-  }
+  const hasWrite = permissions.includes(VFS_PERM_WRITE);
+  const hasRead = hasWrite || permissions.includes(VFS_PERM_READ);
+  if (VFS_READ_METHODS.has(method)) return hasRead;
+  if (VFS_WRITE_METHODS.has(method)) return hasWrite;
   return false;
 }
 

@@ -54,9 +54,9 @@ function base64ToBytes(b64: string): Uint8Array {
  * 顶层是二进制 → 包成 wrapper；其他类型原样返回。
  *
  * **`Blob` / `File` 明确不支持**：它们的实际字节是异步取的（`await blob.arrayBuffer()`），
- * 这里为了保持同步接口不能默默 await。以前是“原样返回”→ chrome.runtime.sendMessage
- * 会把 Blob 序列化成空对象 `{}` → 上游报个迷糊的 "must be string/Uint8Array/..."，
- * 是默默数据腐败。现在直接报错，提示调用方先 `await blob.arrayBuffer()`。
+ * 这里为了保持同步接口不能隐式 await。早期实现是「原样返回」→ chrome.runtime.sendMessage
+ * 会把 Blob 序列化成空对象 `{}` → 上游报一个含糊的 "must be string/Uint8Array/..."，
+ * 属于静默数据损坏。现在直接抛错，提示调用方先做 `await blob.arrayBuffer()`。
  */
 export function encodeBinary(value: unknown): unknown {
   if (value instanceof Uint8Array) {
@@ -72,7 +72,7 @@ export function encodeBinary(value: unknown): unknown {
       [BIN_MARKER]: bytesToBase64(new Uint8Array(view.buffer, view.byteOffset, view.byteLength)),
     } satisfies BinaryWrapper;
   }
-  // Blob / File 不允许默默通过 —— 会被 JSON 敁成空对象，造成难调的默默损坏。
+  // Blob / File 不允许静默通过 —— 会被 JSON 压成空对象，造成难定位的数据损坏。
   if (typeof Blob !== 'undefined' && value instanceof Blob) {
     throw new Error(
       'Cannot pass a Blob/File through sandbox RPC. Convert it first: ' +
