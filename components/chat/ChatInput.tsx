@@ -31,9 +31,14 @@ import { useRecorder } from '@/hooks/useRecorder';
 import { useMobileEmulation } from '@/hooks/useMobileEmulation';
 import { downloadFile, formatDuration, formatCharCount } from '@/lib/utils';
 import { t } from '@/lib/i18n';
+import type { PromptDispatchResult } from '@/hooks/useBackgroundAgent';
 
 interface ChatInputProps {
-  onSend: (message: string, attachments?: Attachment[]) => void;
+  onSend: (
+    message: string,
+    attachments: Attachment[] | undefined,
+    expectedSessionId: string | null,
+  ) => Promise<PromptDispatchResult>;
   onOpenSettings?: () => void;
   isAgentRunning?: boolean;
   onCancel?: () => void;
@@ -65,6 +70,8 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const slashMenuRef = useRef<HTMLDivElement>(null);
+  const sessionIdRef = useRef<string | null>(sessionId ?? null);
+  sessionIdRef.current = sessionId ?? null;
 
   const [currentModel, setCurrentModel] = useStorageItem(activeModel, null);
   const [currentThinkingLevel, setCurrentThinkingLevel] = useStorageItem(thinkingLevel, 'medium');
@@ -141,9 +148,11 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
   // value. handleSend just needs to await stop() so any in-flight session
   // delivery completes before we read attachments.
   const recorder = useRecorder();
-  // Guard against re-entry while we're awaiting recorder.stop().
-  const sendingRef = useRef(false);
-  const [isSending, setIsSending] = useState(false);
+  // Guard the short dispatch window: recorder finalization plus prompt
+  // delivery / one fast reconnect retry. Once the prompt is dispatched,
+  // the composer becomes editable again while the agent replies.
+  const isDispatchingRef = useRef(false);
+  const [isDispatching, setIsDispatching] = useState(false);
 
   // Keep the ref in sync with state so any post-await reader sees the
   // most-recent attachments without depending on a re-render.
@@ -187,7 +196,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
 
   const handleSend = async () => {
     if (!canSend) return;
-    if (sendingRef.current) return;
+    if (isDispatchingRef.current) return;
     if (!currentModel) {
       toast.error(t('chat.composer.needModel'), {
         action: onOpenSettings ? { label: t('chat.composer.goToSettings'), onClick: onOpenSettings } : undefined,
@@ -198,36 +207,42 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
     // Snapshot the text BEFORE any await so a fast follow-up edit doesn't
     // leak into the outgoing message.
     const text = value.trim();
+    const dispatchSessionId = sessionIdRef.current;
 
-    if (recorder.isOwner) {
-      // Pre-flight cap check: refuse to send if attachments are already
-      // full — otherwise the about-to-be-delivered recording would be
-      // silently dropped by the session subscription's overflow guard.
-      if (attachmentsRef.current.length >= MAX_ATTACHMENT_COUNT) {
-        toast.warning(t('chat.composer.maxAttachments', [MAX_ATTACHMENT_COUNT]));
-        return;
-      }
-      sendingRef.current = true;
-      setIsSending(true);
-      try {
+    isDispatchingRef.current = true;
+    setIsDispatching(true);
+
+    try {
+      if (recorder.isOwner) {
+        // Pre-flight cap check: refuse to send if attachments are already
+        // full — otherwise the about-to-be-delivered recording would be
+        // silently dropped by the session subscription's overflow guard.
+        if (attachmentsRef.current.length >= MAX_ATTACHMENT_COUNT) {
+          toast.warning(t('chat.composer.maxAttachments', [MAX_ATTACHMENT_COUNT]));
+          return;
+        }
         // Wait for the BG to finalize. The session is delivered (and
         // appended to `attachmentsRef`) synchronously by the channel
         // subscription above before this await resolves.
         await recorder.stop();
-      } finally {
-        sendingRef.current = false;
-        setIsSending(false);
       }
-    }
+      if (sessionIdRef.current !== dispatchSessionId) return;
 
-    const outgoing = attachmentsRef.current;
-    onSend(text, outgoing.length > 0 ? outgoing : undefined);
-    setValue('');
-    setAttachments([]);
-    attachmentsRef.current = [];
-    setShowSlash(false);
-    setHistoryIndex(null);
-    setDraft('');
+      const outgoing = attachmentsRef.current;
+      const result = await onSend(text, outgoing.length > 0 ? outgoing : undefined, dispatchSessionId);
+      if (result.status !== 'dispatched') return;
+      if (sessionIdRef.current !== dispatchSessionId) return;
+
+      setValue('');
+      setAttachments([]);
+      attachmentsRef.current = [];
+      setShowSlash(false);
+      setHistoryIndex(null);
+      setDraft('');
+    } finally {
+      isDispatchingRef.current = false;
+      setIsDispatching(false);
+    }
   };
 
   // Reset history navigation when switching sessions.
@@ -333,7 +348,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
 
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (!isAgentRunning && !isSending) handleSend();
+      if (!isAgentRunning && !isDispatching) handleSend();
     }
   };
 
@@ -385,12 +400,14 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
 
   // Handle prompt selection from slash menu
   const handlePromptSelect = async (prompt: PromptMeta) => {
+    if (isDispatchingRef.current) return;
     try {
       const raw = await vfs.readFile(`${CEBIAN_PROMPTS_DIR}/${prompt.fileName}`, 'utf8');
       const content = typeof raw === 'string' ? raw : new TextDecoder().decode(raw as Uint8Array);
       const { body } = parseFrontmatter(content);
       const vars = await gatherTemplateVars();
       const replaced = replaceTemplateVars(body.trim(), vars);
+      if (isDispatchingRef.current) return;
       setValue(replaced);
       setShowSlash(false);
       textareaRef.current?.focus();
@@ -400,6 +417,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
   };
 
   const handlePickElement = async () => {
+    if (isDispatchingRef.current) return;
     if (isPicking) {
       cancelElementPicker();
       return;
@@ -407,6 +425,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
     setIsPicking(true);
     try {
       const result = await startElementPicker();
+      if (isDispatchingRef.current) return;
       switch (result.status) {
         case 'ok': {
           const att = result.attachment;
@@ -446,12 +465,14 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
   };
 
   const handleScreenshot = async () => {
+    if (isDispatchingRef.current) return;
     if (attachments.length >= MAX_ATTACHMENT_COUNT) {
       toast.warning(t('chat.composer.maxAttachments', [MAX_ATTACHMENT_COUNT]));
       return;
     }
     try {
       const dataUrl = await chrome.tabs.captureVisibleTab({ format: 'jpeg', quality: 85 });
+      if (isDispatchingRef.current) return;
       const base64 = dataUrl.split(',', 2)[1] ?? '';
       setAttachments((prev) => [
         ...prev,
@@ -464,6 +485,10 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isDispatchingRef.current) {
+      e.target.value = '';
+      return;
+    }
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -487,6 +512,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
         }
         const reader = new FileReader();
         reader.onload = () => {
+          if (isDispatchingRef.current) return;
           const dataUrl = reader.result as string;
           const base64 = dataUrl.split(',', 2)[1] ?? '';
           const mimeType = file.type || 'image/png';
@@ -504,6 +530,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
         }
         const reader = new FileReader();
         reader.onload = () => {
+          if (isDispatchingRef.current) return;
           setAttachments((prev) => {
             if (prev.length >= MAX_ATTACHMENT_COUNT) return prev;
             return [...prev, { type: 'file', content: reader.result as string, name: file.name, mimeType: file.type || 'text/plain', size: file.size }];
@@ -521,6 +548,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (isDispatchingRef.current) return;
     const items = e.clipboardData?.items;
     if (!items || items.length === 0) return;
 
@@ -558,6 +586,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
       }
       const reader = new FileReader();
       reader.onload = () => {
+        if (isDispatchingRef.current) return;
         const dataUrl = reader.result as string;
         const base64 = dataUrl.split(',', 2)[1] ?? '';
         const mimeType = file.type || 'image/png';
@@ -578,6 +607,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
   };
 
   const removeAttachment = (index: number) => {
+    if (isDispatchingRef.current) return;
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -601,8 +631,9 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
                   <button
                     key={p.fileName}
                     data-prompt-index={idx}
+                    disabled={isDispatching}
                     onClick={() => handlePromptSelect(p)}
-                    onMouseMove={() => setSelectedPromptIndex(idx)}
+                    onMouseMove={() => { if (!isDispatching) setSelectedPromptIndex(idx); }}
                     className={`w-full flex items-start gap-2.5 px-3 py-2 text-left transition-colors ${selected ? 'bg-accent' : 'hover:bg-accent/50'}`}
                   >
                     <FileType className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
@@ -629,15 +660,16 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
             size="icon-xs"
             title={isPicking ? t('chat.composer.cancelPick') : t('chat.composer.pickElement')}
             onClick={handlePickElement}
+            disabled={isDispatching}
             className={isPicking ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}
           >
             <MousePointer2 className="size-3.5" />
           </Button>
-          <RecordButton disabled={isAgentRunning} />
-          <Button variant="ghost" size="icon-xs" title={t('chat.composer.screenshot')} onClick={handleScreenshot}>
+          <RecordButton disabled={isDispatching} />
+          <Button variant="ghost" size="icon-xs" title={t('chat.composer.screenshot')} onClick={handleScreenshot} disabled={isDispatching}>
             <Camera className="size-3.5" />
           </Button>
-          <Button variant="ghost" size="icon-xs" title={t('chat.composer.uploadFile')} onClick={() => fileInputRef.current?.click()}>
+          <Button variant="ghost" size="icon-xs" title={t('chat.composer.uploadFile')} onClick={() => fileInputRef.current?.click()} disabled={isDispatching}>
             <Paperclip className="size-3.5" />
           </Button>
           <input
@@ -646,6 +678,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
             multiple
             accept="image/*,.txt,.md,.csv,.tsv,.log,.js,.ts,.jsx,.tsx,.mjs,.cjs,.py,.java,.c,.cpp,.h,.hpp,.go,.rs,.rb,.php,.sh,.bash,.sql,.yaml,.yml,.toml,.ini,.cfg,.json,.xml,.html,.htm,.css,.scss,.less,.env,.gitignore,.editorconfig"
             className="hidden"
+            disabled={isDispatching}
             onChange={handleFileUpload}
           />
           <Button
@@ -654,6 +687,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
             title={t('chat.composer.mobileMode')}
             className={isActiveTabMobile ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}
             onClick={toggleMobile}
+            disabled={isDispatching}
           >
             <Smartphone className="size-3.5" />
           </Button>
@@ -686,6 +720,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
                       </span>
                       <button
                         className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
+                        disabled={isDispatching}
                         onClick={() => removeAttachment(i)}
                       >
                         <X className="size-2.5" />
@@ -711,6 +746,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
                       </button>
                       <button
                         className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
+                        disabled={isDispatching}
                         onClick={() => removeAttachment(i)}
                       >
                         <X className="size-2.5" />
@@ -737,6 +773,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
 
                       <button
                         className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
+                        disabled={isDispatching}
                         onClick={() => removeAttachment(i)}
                       >
                         <X className="size-2.5" />
@@ -758,12 +795,13 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           placeholder={t('chat.composer.placeholder')}
+          disabled={isDispatching}
           className="w-full bg-transparent border-none outline-none resize-none text-foreground text-[0.85rem] px-3 py-2 min-h-11 max-h-37.5 leading-relaxed placeholder:text-muted-foreground/50"
         />
 
         {/* Bottom row: actions */}
         <div className="flex items-center justify-between px-2 pb-1.5">
-          <div className="flex items-center gap-0.5">
+          <div className={`flex items-center gap-0.5 ${isDispatching ? 'pointer-events-none opacity-60' : ''}`}>
             <ModelSelector
               activeModel={currentModel}
               configuredProviders={providers}
@@ -794,7 +832,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
                 variant="ghost"
                 size="icon-xs"
                 onClick={handleSend}
-                disabled={!canSend || isSending}
+                disabled={!canSend || isDispatching}
                 aria-label={t('common.send')}
                 className="bg-foreground text-background hover:bg-primary hover:text-primary-foreground hover:shadow-xs disabled:opacity-30 disabled:cursor-not-allowed"
               >

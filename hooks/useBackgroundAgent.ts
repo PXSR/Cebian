@@ -31,6 +31,12 @@ export interface PendingToolInfo {
   args: any;
 }
 
+export type PromptDispatchResult =
+  | { status: 'dispatched' }
+  | { status: 'notDispatched'; reason: 'empty' | 'unavailable' };
+
+const PROMPT_RECONNECT_TIMEOUT_MS = 1_500;
+
 // ─── Callbacks ───
 
 export interface AgentPortCallbacks {
@@ -56,6 +62,8 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
 
   const portRef = useRef<chrome.runtime.Port | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const connectedWaitersRef = useRef<Set<(connected: boolean) => void>>(new Set());
+  const scheduleRetryRef = useRef<(() => void) | null>(null);
   // Stable callback refs to avoid re-creating the port listener
   const callbacksRef = useRef(callbacks);
   callbacksRef.current = callbacks;
@@ -70,14 +78,30 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
 
     const handleMessage = (msg: ServerMessage) => {
       if (unmounted) return;
+      const isCurrentSession = (sessionId: string | null | undefined) =>
+        sessionId != null && sessionId === sessionIdRef.current;
       switch (msg.type) {
-        case 'connected':
+        case 'connected': {
           retryCount = 0;
           setState(prev => ({ ...prev, connected: true, lastError: null }));
+          const waiters = Array.from(connectedWaitersRef.current);
+          connectedWaitersRef.current.clear();
+          for (const resolve of waiters) resolve(true);
           break;
+        }
 
         case 'session_state':
-          sessionIdRef.current = msg.sessionId;
+          if (!isCurrentSession(msg.sessionId)) break;
+          if (msg.pendingTools) {
+            const next = new Map<string, PendingToolInfo>();
+            for (const pending of msg.pendingTools) {
+              next.set(pending.toolName, {
+                toolCallId: pending.toolCallId,
+                args: pending.args,
+              });
+            }
+            setPendingTools(next);
+          }
           setState(prev => ({
             ...prev,
             sessionId: msg.sessionId,
@@ -91,10 +115,12 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           break;
 
         case 'agent_start':
+          if (!isCurrentSession(msg.sessionId)) break;
           setState(prev => ({ ...prev, isAgentRunning: true }));
           break;
 
         case 'message_update':
+          if (!isCurrentSession(msg.sessionId)) break;
           setState(prev => {
             const msgs = [...prev.messages];
             const last = msgs[msgs.length - 1];
@@ -108,10 +134,12 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           break;
 
         case 'message_end':
+          if (!isCurrentSession(msg.sessionId)) break;
           setState(prev => ({ ...prev, messages: msg.messages }));
           break;
 
         case 'agent_end':
+          if (!isCurrentSession(msg.sessionId)) break;
           setState(prev => ({
             ...prev,
             messages: msg.messages,
@@ -121,6 +149,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           break;
 
         case 'tool_pending':
+          if (!isCurrentSession(msg.sessionId)) break;
           setPendingTools(prev => {
             const next = new Map(prev);
             next.set(msg.toolName, { toolCallId: msg.toolCallId, args: msg.args });
@@ -129,6 +158,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           break;
 
         case 'tool_resolved':
+          if (!isCurrentSession(msg.sessionId)) break;
           setPendingTools(prev => {
             const next = new Map(prev);
             next.delete(msg.toolName);
@@ -137,7 +167,8 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           break;
 
         case 'session_created':
-          sessionIdRef.current = msg.sessionId;
+          if (!isCurrentSession(msg.sessionId)) break;
+          setPendingTools(new Map());
           setState(prev => ({
             ...prev,
             sessionId: msg.sessionId,
@@ -147,8 +178,9 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           break;
 
         case 'session_loaded':
+          if (!isCurrentSession(msg.sessionId)) break;
+          setPendingTools(new Map());
           if (msg.session) {
-            sessionIdRef.current = msg.session.id;
             setState(prev => ({
               ...prev,
               sessionId: msg.session!.id,
@@ -169,6 +201,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           break;
 
         case 'error':
+          if (msg.sessionId && !isCurrentSession(msg.sessionId)) break;
           console.error('[AgentPort] Error:', msg.error);
           setState(prev => ({ ...prev, isAgentRunning: false, lastError: msg.error }));
           break;
@@ -208,11 +241,18 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           lastError: t('chat.session.reconnecting'),
         }));
       }
-      retryTimer = setTimeout(connect, delay);
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        connect();
+      }, delay);
     }
+
+    scheduleRetryRef.current = scheduleRetry;
 
     function connect() {
       if (unmounted) return;
+      const sessionToRestore = sessionIdRef.current;
 
       let port: chrome.runtime.Port;
       try {
@@ -230,6 +270,21 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
 
       port.onMessage.addListener(handleMessage);
 
+      let disconnected = false;
+      const handleDisconnect = () => {
+        if (unmounted) return;
+        if (disconnected) return;
+        disconnected = true;
+        if (portRef.current === port) {
+          portRef.current = null;
+          recorderChannel.setPort(null);
+          mcpAppResourceChannel.setPort(null);
+          setState(prev => ({ ...prev, connected: false }));
+        }
+        scheduleRetry();
+      };
+      port.onDisconnect.addListener(handleDisconnect);
+
       // Tell the background which sidepanel/tab instance this port belongs
       // to so the recorder can gate stop() and detect initiator-disconnect.
       // Sent synchronously — the instance id is generated at module load
@@ -240,18 +295,12 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           type: 'hello',
           instanceId: myInstanceId,
         } satisfies ClientMessage);
+        if (sessionToRestore) {
+          port.postMessage({ type: 'subscribe', sessionId: sessionToRestore } satisfies ClientMessage);
+        }
       } catch {
-        /* port already disconnected */
+        handleDisconnect();
       }
-
-      port.onDisconnect.addListener(() => {
-        if (unmounted) return;
-        portRef.current = null;
-        recorderChannel.setPort(null);
-        mcpAppResourceChannel.setPort(null);
-        setState(prev => ({ ...prev, connected: false }));
-        scheduleRetry();
-      });
     }
 
     connect();
@@ -259,6 +308,10 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     return () => {
       unmounted = true;
       if (retryTimer) clearTimeout(retryTimer);
+      scheduleRetryRef.current = null;
+      const waiters = Array.from(connectedWaitersRef.current);
+      connectedWaitersRef.current.clear();
+      for (const resolve of waiters) resolve(false);
       portRef.current?.disconnect();
       portRef.current = null;
       recorderChannel.setPort(null);
@@ -272,19 +325,54 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     portRef.current?.postMessage(msg);
   }, []);
 
-  const send = useCallback((text: string, attachments?: Attachment[]) => {
-    if (!text.trim()) return;
-    if (!portRef.current) {
-      setState(prev => ({ ...prev, lastError: t('chat.session.notConnected') }));
-      return;
+  const waitForConnected = useCallback((timeoutMs: number): Promise<boolean> => {
+    if (portRef.current) return Promise.resolve(true);
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (connected: boolean) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        connectedWaitersRef.current.delete(finish);
+        resolve(connected && !!portRef.current);
+      };
+      const timeout = setTimeout(() => finish(false), timeoutMs);
+      connectedWaitersRef.current.add(finish);
+    });
+  }, []);
+
+  const dispatchPrompt = useCallback((
+    text: string,
+    attachments: Attachment[] | undefined,
+    expectedSessionId: string | null,
+  ): boolean => {
+    if (sessionIdRef.current !== expectedSessionId) return false;
+
+    const port = portRef.current;
+    if (!port) return false;
+
+    const existingSessionId = sessionIdRef.current;
+    const sessionId = existingSessionId ?? crypto.randomUUID();
+
+    try {
+      port.postMessage({ type: 'prompt', sessionId, text, attachments });
+    } catch {
+      if (portRef.current === port) {
+        portRef.current = null;
+        recorderChannel.setPort(null);
+        mcpAppResourceChannel.setPort(null);
+        setState(prev => ({ ...prev, connected: false }));
+        scheduleRetryRef.current?.();
+      }
+      return false;
     }
-    // Allocate sessionId client-side on first send so cancel() works even if
-    // the user aborts before the background broadcasts 'session_created'.
-    let sessionId = sessionIdRef.current;
-    if (!sessionId) {
-      sessionId = crypto.randomUUID();
+
+    // 真正投递成功后再写入新 sessionId，避免重连等待期间订阅一个尚未创建的会话。
+    if (!existingSessionId) {
       sessionIdRef.current = sessionId;
     }
+
     // Optimistically add user message to local state for immediate UI feedback
     setState(prev => {
       const content: any[] = [{ type: 'text' as const, text: text.trim() }];
@@ -304,8 +392,33 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
         lastError: null,
       };
     });
-    postMessage({ type: 'prompt', sessionId, text, attachments });
-  }, [postMessage]);
+    return true;
+  }, []);
+
+  const send = useCallback(async (
+    text: string,
+    attachments?: Attachment[],
+    expectedSessionId: string | null = sessionIdRef.current,
+  ): Promise<PromptDispatchResult> => {
+    const trimmed = text.trim();
+    if (!trimmed) return { status: 'notDispatched', reason: 'empty' };
+
+    const startedSessionId = expectedSessionId;
+    if (dispatchPrompt(trimmed, attachments, startedSessionId)) return { status: 'dispatched' };
+
+    const connected = await waitForConnected(PROMPT_RECONNECT_TIMEOUT_MS);
+    if (!connected || sessionIdRef.current !== startedSessionId) {
+      if (sessionIdRef.current === startedSessionId) {
+        setState(prev => ({ ...prev, lastError: t('chat.session.notConnected') }));
+      }
+      return { status: 'notDispatched', reason: 'unavailable' };
+    }
+
+    if (dispatchPrompt(trimmed, attachments, startedSessionId)) return { status: 'dispatched' };
+
+    setState(prev => ({ ...prev, lastError: t('chat.session.notConnected') }));
+    return { status: 'notDispatched', reason: 'unavailable' };
+  }, [dispatchPrompt, waitForConnected]);
 
   const cancel = useCallback(() => {
     const sessionId = sessionIdRef.current;
@@ -351,8 +464,20 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
   }, [postMessage]);
 
   const subscribe = useCallback((sessionId: string) => {
+    const isSessionChange = sessionIdRef.current !== sessionId;
+    if (isSessionChange) {
+      setPendingTools(new Map());
+    }
     sessionIdRef.current = sessionId;
-    setState(prev => ({ ...prev, sessionId }));
+    setState(prev => isSessionChange
+      ? {
+          ...prev,
+          messages: [],
+          isAgentRunning: false,
+          sessionTitle: '',
+          lastError: null,
+        }
+      : { ...prev, sessionId });
     postMessage({ type: 'subscribe', sessionId });
   }, [postMessage]);
 

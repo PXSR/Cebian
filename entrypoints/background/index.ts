@@ -271,9 +271,10 @@ export default defineBackground(() => {
       try {
         await handleClientMessage(port, msg);
       } catch (err: any) {
+        const sessionId = 'sessionId' in msg ? msg.sessionId : null;
         safePost(port, {
           type: 'error',
-          sessionId: null,
+          sessionId,
           error: err.message ?? String(err),
         });
       }
@@ -337,12 +338,14 @@ export default defineBackground(() => {
               title: session?.title ?? '',
               messages: fresh.messages,
               isRunning: fresh.isRunning,
+              pendingTools: fresh.pendingTools,
             });
           } else {
             // Agent finished during the await — fall through to DB-based
             // session_loaded using the row we already loaded.
             safePost(port, {
               type: 'session_loaded',
+              sessionId: msg.sessionId,
               session: session ?? null,
             });
           }
@@ -352,12 +355,14 @@ export default defineBackground(() => {
           if (session) {
             safePost(port, {
               type: 'session_loaded',
+              sessionId: msg.sessionId,
               session,
             });
           } else {
             // Session not found in DB
             safePost(port, {
               type: 'session_loaded',
+              sessionId: msg.sessionId,
               session: null,
             });
           }

@@ -131,6 +131,14 @@ class AgentManager {
     }
   }
 
+  private getPendingToolSnapshot(managed: ManagedSession): { toolName: string; toolCallId: string; args: any }[] {
+    return managed.toolCtx.getPendingRequests().map(({ toolName, pending }) => ({
+      toolName,
+      toolCallId: pending.toolCallId,
+      args: pending.request,
+    }));
+  }
+
   /**
    * Rebuild every live session's tool array from current MCP config.
    * Called when the user adds, removes, enables, disables, or edits an MCP
@@ -487,6 +495,13 @@ class AgentManager {
         managed.rebuildController = new AbortController();
         const signal = managed.rebuildController.signal;
         this.updateKeepAlive();
+        this.broadcast(sessionId, {
+          type: 'session_state',
+          sessionId,
+          messages: currentMessages,
+          isRunning: true,
+          pendingTools: this.getPendingToolSnapshot(managed),
+        });
 
         try {
           // Tear down old in place. `sessionCreated` is preserved by
@@ -517,6 +532,7 @@ class AgentManager {
               sessionId,
               messages: currentMessages,
               isRunning: false,
+              pendingTools: [],
             });
             return;
           }
@@ -537,6 +553,13 @@ class AgentManager {
           // consistency holds. Re-throw to surface the error to the
           // outer `prompt()` caller, which broadcasts it as `'error'`.
           this.sessions.delete(sessionId);
+          this.broadcast(sessionId, {
+            type: 'session_state',
+            sessionId,
+            messages: currentMessages,
+            isRunning: false,
+            pendingTools: [],
+          });
           throw err;
         } finally {
           managed.rebuildController = undefined;
@@ -624,6 +647,7 @@ class AgentManager {
     managed.rebuildController = new AbortController();
     const signal = managed.rebuildController.signal;
     this.updateKeepAlive();
+    let busySnapshot: AgentMessage[] | null = null;
 
     try {
       const messages = [...managed.agent.state.messages];
@@ -634,6 +658,14 @@ class AgentManager {
         // instead of silently no-oping.
         throw new Error('No user message found to retry');
       }
+      busySnapshot = truncated;
+      this.broadcast(sessionId, {
+        type: 'session_state',
+        sessionId,
+        messages: truncated,
+        isRunning: true,
+        pendingTools: this.getPendingToolSnapshot(managed),
+      });
 
       // Persist truncation BEFORE tearing down. SW restart in the rebuild
       // window must not resurrect the failed turn from disk. `flush`
@@ -700,6 +732,7 @@ class AgentManager {
         sessionId,
         messages: truncated,
         isRunning: true,
+        pendingTools: this.getPendingToolSnapshot(managed),
       });
 
       // Resume the agent loop against the truncated transcript (last
@@ -720,6 +753,15 @@ class AgentManager {
       // pre-continue), we'd otherwise be stuck. Matches `prompt()`'s
       // model-switch catch.
       this.sessions.delete(managed.sessionId);
+      if (busySnapshot) {
+        this.broadcast(managed.sessionId, {
+          type: 'session_state',
+          sessionId: managed.sessionId,
+          messages: busySnapshot,
+          isRunning: false,
+          pendingTools: [],
+        });
+      }
       throw err;
     } finally {
       managed.rebuildController = undefined;
@@ -815,6 +857,7 @@ class AgentManager {
       sessionId: managed.sessionId,
       messages: finalMessages,
       isRunning: false,
+      pendingTools: [],
     });
   }
 
@@ -976,18 +1019,22 @@ class AgentManager {
 
   /** Get current state for a session (for reconnecting clients).
    *
-   *  `isRunning` in the returned shape is the external contract (broadcast
-   *  in `session_state`, consumed by the sidepanel hook). It's true iff the
-   *  agent is actively streaming — `rebuilding` is NOT surfaced as "running"
-   *  here because the agent hasn't fired `agent_start` yet; the running flag
-   *  is set to true at the retry broadcast site explicitly to keep the UI's
-   *  stop button visible across the rebuild window. */
-  getSessionState(sessionId: string): { messages: AgentMessage[]; isRunning: boolean } | null {
+   *  `isRunning` is the sidepanel's "busy" signal: true while the session
+   *  cannot accept a normal prompt yet. That includes both active streaming
+   *  and rebuild windows (retry / model switch), so a reconnecting or second
+   *  window keeps the composer blocked instead of dispatching a prompt the
+   *  manager would ignore while `phase === 'rebuilding'`. */
+  getSessionState(sessionId: string): {
+    messages: AgentMessage[];
+    isRunning: boolean;
+    pendingTools: { toolName: string; toolCallId: string; args: any }[];
+  } | null {
     const managed = this.sessions.get(sessionId);
     if (!managed) return null;
     return {
       messages: [...managed.agent.state.messages],
-      isRunning: managed.phase === 'running',
+      isRunning: managed.phase !== 'idle',
+      pendingTools: this.getPendingToolSnapshot(managed),
     };
   }
 

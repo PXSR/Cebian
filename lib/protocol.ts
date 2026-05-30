@@ -55,7 +55,14 @@ export type SessionMeta = Omit<SessionRecord, 'messages'> & {
 
 export type ServerMessage =
   | { type: 'connected' }
-  | { type: 'session_state'; sessionId: string; title?: string; messages: AgentMessage[]; isRunning: boolean }
+  | {
+      type: 'session_state';
+      sessionId: string;
+      title?: string;
+      messages: AgentMessage[];
+      isRunning: boolean;
+      pendingTools?: { toolName: string; toolCallId: string; args: any }[];
+    }
   | { type: 'agent_start'; sessionId: string }
   | { type: 'message_update'; sessionId: string; message: AgentMessage }
   | { type: 'message_end'; sessionId: string; messages: AgentMessage[] }
@@ -63,7 +70,7 @@ export type ServerMessage =
   | { type: 'error'; sessionId: string | null; error: string }
   | { type: 'tool_pending'; sessionId: string; toolName: string; toolCallId: string; args: any }
   | { type: 'tool_resolved'; sessionId: string; toolName: string }
-  | { type: 'session_loaded'; session: SessionRecord | null }
+  | { type: 'session_loaded'; sessionId: string; session: SessionRecord | null }
   | { type: 'session_list_result'; sessions: SessionMeta[] }
   | { type: 'session_deleted'; sessionId: string }
   | { type: 'session_created'; sessionId: string; title: string }

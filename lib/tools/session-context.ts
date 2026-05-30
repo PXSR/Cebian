@@ -79,6 +79,16 @@ export class SessionToolContext {
     return false;
   }
 
+  /** Snapshot all currently pending interactive tool requests. */
+  getPendingRequests(): Array<{ toolName: string; pending: PendingRequest<any> }> {
+    const pending: Array<{ toolName: string; pending: PendingRequest<any> }> = [];
+    for (const [toolName, bridge] of this.bridges) {
+      const request = bridge.getPending();
+      if (request) pending.push({ toolName, pending: request });
+    }
+    return pending;
+  }
+
   /** Resolve a specific tool's pending request with the user's response. */
   resolve(toolName: string, response: any): void {
     this.bridges.get(toolName)?.resolve(response);

@@ -126,9 +126,12 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
   // Force-pin when the user sends a new message — sending is an explicit
   // intent to see the latest output.
   const handleSend = useCallback(
-    (text: string, attachments?: Attachment[]) => {
-      scrollToBottom({ force: true });
-      send(text, attachments);
+    async (text: string, attachments: Attachment[] | undefined, expectedSessionId: string | null) => {
+      const result = await send(text, attachments, expectedSessionId);
+      if (result.status === 'dispatched') {
+        scrollToBottom({ force: true });
+      }
+      return result;
     },
     [scrollToBottom, send],
   );
@@ -147,8 +150,9 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     [messages],
   );
 
-  // Session loading state: we're loading if a session route is targeted but no messages or state yet
-  const sessionLoading = !isNewChat && routeSessionId !== activeSessionId && messages.length === 0;
+  // Session loading state: any route/state mismatch means the current
+  // message array belongs to a different chat and must not be rendered.
+  const sessionLoading = !isNewChat && routeSessionId !== activeSessionId;
 
   return (
     <>
@@ -442,7 +446,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
         isAgentRunning={effectiveRunning}
         onOpenSettings={onOpenSettings}
         userHistory={userHistory}
-        sessionId={activeSessionId ?? routeSessionId ?? null}
+        sessionId={isNewChat ? activeSessionId : routeSessionId ?? null}
       />
     </>
   );
