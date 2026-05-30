@@ -4,6 +4,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 import { DialogOutlet } from '@/components/dialogs/outlet';
 import { ConfirmOutlet } from '@/components/dialogs/confirm-outlet';
+import { UpdateNoticeOutlet } from '@/components/dialogs/update-notice-outlet';
 import { Header } from '@/components/layout/Header';
 import { HistoryPanel } from '@/components/layout/HistoryPanel';
 import { useStorageItem } from '@/hooks/useStorageItem';
@@ -129,6 +130,7 @@ function App() {
         <Toaster theme={resolveTheme(theme)} />
         <DialogOutlet />
         <ConfirmOutlet />
+        <UpdateNoticeOutlet />
       </div>
     </TooltipProvider>
   );

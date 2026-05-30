@@ -132,7 +132,6 @@ export function useUpdateCheck() {
     void runCheck(false);
     return () => {
       mountedRef.current = false;
-      abortRef.current?.abort();
     };
   }, [runCheck]);
 

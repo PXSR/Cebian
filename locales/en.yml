@@ -462,6 +462,12 @@ dialogs:
   imagePreview:
     title: "Image preview"
     alt: "Preview"
+  updateNotice:
+    title: "New version available"
+    # $1 = latest version, $2 = current version
+    description: "Cebian v$1 is out. You're on v$2."
+    updateNow: "Update now"
+    skipVersion: "Skip this version"
 
 # ─── VFS browser entrypoint ───
 vfs:

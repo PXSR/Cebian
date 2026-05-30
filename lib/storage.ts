@@ -151,3 +151,20 @@ export const lastSettingsSection = storage.defineItem<string>(
   'local:lastSettingsSection',
   { fallback: 'providers' },
 );
+
+// ─── Update notice (in-app "new version available" dialog) ───
+
+/**
+ * 控制「发现新版本」弹窗的提醒频率与版本跳过状态。
+ * - `skippedVersion`：用户点「跳过此版本」后记录的版本号，等于最新版时不再弹窗。
+ * - `lastPromptedAt`：上次弹窗的时间戳，用于 24h 节流（关闭/立即更新后写入）。
+ */
+export interface UpdateNoticeState {
+  skippedVersion: string | null;
+  lastPromptedAt: number;
+}
+
+export const updateNoticeState = storage.defineItem<UpdateNoticeState>(
+  'local:updateNoticeState',
+  { fallback: { skippedVersion: null, lastPromptedAt: 0 } },
+);

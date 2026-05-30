@@ -451,6 +451,12 @@ dialogs:
   imagePreview:
     title: "圖片預覽"
     alt: "預覽"
+  updateNotice:
+    title: "發現新版本"
+    # $1 = latest version, $2 = current version
+    description: "Cebian v$1 已發佈，目前版本 v$2。"
+    updateNow: "立即更新"
+    skipVersion: "略過此版本"
 
 # ─── VFS 瀏覽入口 ───
 vfs:
