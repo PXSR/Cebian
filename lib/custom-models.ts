@@ -32,7 +32,7 @@ export function toModel(config: CustomProviderConfig, model: CustomModelDef): Mo
     provider: customProviderKey(config.id),
     baseUrl: config.baseUrl,
     reasoning: model.reasoning,
-    input: ['text'] as ('text' | 'image')[],
+    input: (model.image ? ['text', 'image'] : ['text']) as ('text' | 'image')[],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: model.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
     maxTokens: model.maxTokens ?? DEFAULT_MAX_TOKENS,

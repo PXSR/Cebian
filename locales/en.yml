@@ -247,6 +247,8 @@ chat:
     readFileFailed: "Failed to read: $1"
     # $1 = file name
     unsupportedFileType: "Unsupported file type: $1"
+    modelNoImage: "Current model doesn't support multimodal input"
+    imageStripped: "Removed image attachments — the current model doesn't support multimodal input"
     noPrompts: "No prompts yet — create one from AI config"
     noMatch: "No matches"
     iframeEnterHint: "⏎ enter"
@@ -371,6 +373,7 @@ provider:
     models: "Models"
     autoFetch: "Auto-fetch"
     reasoning: "Reasoning"
+    image: "Multimodal"
     manualModelPlaceholder: "Manual Model ID"
     addCustom: "Add custom provider"
     fetchFailed: "Failed to fetch models, please add manually"

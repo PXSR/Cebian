@@ -243,6 +243,8 @@ chat:
     readFileFailed: "读取失败：$1"
     # $1 = 文件名
     unsupportedFileType: "不支持的文件类型：$1"
+    modelNoImage: "当前模型不支持多模态输入"
+    imageStripped: "已移除图片附件——当前模型不支持多模态输入"
     noPrompts: "暂无 Prompt，前往 AI 配置创建"
     noMatch: "无匹配结果"
     iframeEnterHint: "⏎ 点击进入"
@@ -360,6 +362,7 @@ provider:
     models: "模型列表"
     autoFetch: "自动获取"
     reasoning: "推理"
+    image: "多模态"
     manualModelPlaceholder: "手动输入 Model ID"
     addCustom: "添加自定义提供商"
     fetchFailed: "无法获取模型列表，请手动添加"

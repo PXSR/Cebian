@@ -34,6 +34,8 @@ export interface CustomModelDef {
   modelId: string;
   name: string;
   reasoning: boolean;
+  /** 模型是否支持图片输入（多模态/VLM）。缺省视为 false（纯文本）。 */
+  image?: boolean;
   contextWindow?: number;
   maxTokens?: number;
 }

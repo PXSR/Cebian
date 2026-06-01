@@ -3,7 +3,7 @@ import { getModels, type KnownProvider, type Api, type Model } from '@earendil-w
 import { Check, ChevronDown, Settings } from 'lucide-react';
 
 import type { ActiveModel, ProviderCredentials, CustomProviderConfig } from '@/lib/storage';
-import { isCustomProvider, findCustomProvider, getCustomModels } from '@/lib/custom-models';
+import { isCustomProvider, findCustomProvider, getCustomModels, customProviderKey } from '@/lib/custom-models';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -37,35 +37,36 @@ export function ModelSelector({
   const [commandValue, setCommandValue] = useState('');
 
   const providerModels = useMemo(() => {
-    const verified = Object.entries(configuredProviders).filter(
-      ([, cred]) => cred.verified,
-    );
-
     const groups: { provider: string; label: string; models: Model<Api>[] }[] = [];
+    const seen = new Set<string>();
 
-    for (const [provider] of verified) {
-      if (isCustomProvider(provider)) {
-        // Custom/preset provider — look up in customProviders list + presets
-        const config = findCustomProvider(customProviders, provider);
-        if (config) {
-          groups.push({
-            provider,
-            label: config.name,
-            models: getCustomModels(config),
-          });
-        }
-      } else {
-        // Built-in pi-ai provider
-        try {
-          const models = getModels(provider as KnownProvider) as Model<Api>[];
-          if (models.length > 0) {
-            groups.push({ provider, label: provider, models });
-          }
-        } catch {
-          // Unknown provider, skip
-        }
+    // 自定义 provider：直接来自 customProviders 列表，不依赖是否配置/验证了
+    // API key（key 是可选的，未配置也应该可见可选。这是 issue #3 的修复）。
+    for (const config of customProviders) {
+      const providerKey = customProviderKey(config.id);
+      const models = getCustomModels(config);
+      if (models.length > 0) {
+        groups.push({ provider: providerKey, label: config.name, models });
+        seen.add(providerKey);
       }
     }
+
+    // 内置 pi-ai provider：仍按已验证的凭据来门控。
+    for (const [provider, cred] of Object.entries(configuredProviders)) {
+      if (!cred.verified) continue;
+      // 自定义的已在上面处理
+      if (isCustomProvider(provider)) continue;
+      if (seen.has(provider)) continue;
+      try {
+        const models = getModels(provider as KnownProvider) as Model<Api>[];
+        if (models.length > 0) {
+          groups.push({ provider, label: provider, models });
+        }
+      } catch {
+        // Unknown provider, skip
+      }
+    }
+
     return groups;
   }, [configuredProviders, customProviders]);
 

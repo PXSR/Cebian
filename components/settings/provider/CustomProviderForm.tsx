@@ -30,6 +30,7 @@ function ProviderFormBody({
   onAddManualModel,
   onRemoveModel,
   onToggleReasoning,
+  onToggleImage,
   onSubmit,
   onCancel,
   submitLabel,
@@ -41,6 +42,7 @@ function ProviderFormBody({
   onAddManualModel: () => void;
   onRemoveModel: (modelId: string) => void;
   onToggleReasoning: (modelId: string) => void;
+  onToggleImage: (modelId: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
   submitLabel: string;
@@ -111,6 +113,14 @@ function ProviderFormBody({
                   <Switch
                     checked={m.reasoning}
                     onCheckedChange={() => onToggleReasoning(m.modelId)}
+                    className="scale-75"
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  <Label className="text-[0.6rem] text-muted-foreground">{t('provider.form.image')}</Label>
+                  <Switch
+                    checked={m.image ?? false}
+                    onCheckedChange={() => onToggleImage(m.modelId)}
                     className="scale-75"
                   />
                 </div>
@@ -192,7 +202,7 @@ function useProviderForm(initial?: { name: string; baseUrl: string; apiKey: stri
     setFetchError('');
     try {
       const remote = await fetchRemoteModels(baseUrl, apiKey);
-      setModels(remote.map(m => ({ modelId: m.id, name: m.id, reasoning: false })));
+      setModels(remote.map(m => ({ modelId: m.id, name: m.id, reasoning: false, image: false })));
       setFetchError('');
     } catch {
       setFetchError(t('provider.form.fetchFailed'));
@@ -204,7 +214,7 @@ function useProviderForm(initial?: { name: string; baseUrl: string; apiKey: stri
   const handleAddManualModel = () => {
     const id = manualModelId.trim();
     if (!id || models.some(m => m.modelId === id)) return;
-    setModels([...models, { modelId: id, name: id, reasoning: false }]);
+    setModels([...models, { modelId: id, name: id, reasoning: false, image: false }]);
     setManualModelId('');
   };
 
@@ -212,6 +222,9 @@ function useProviderForm(initial?: { name: string; baseUrl: string; apiKey: stri
 
   const handleToggleReasoning = (modelId: string) =>
     setModels(models.map(m => m.modelId === modelId ? { ...m, reasoning: !m.reasoning } : m));
+
+  const handleToggleImage = (modelId: string) =>
+    setModels(models.map(m => m.modelId === modelId ? { ...m, image: !m.image } : m));
 
   const reset = () => {
     setName('');
@@ -222,7 +235,7 @@ function useProviderForm(initial?: { name: string; baseUrl: string; apiKey: stri
     setFetchError('');
   };
 
-  return { fields, onFieldChange, handleFetchModels, handleAddManualModel, handleRemoveModel, handleToggleReasoning, reset };
+  return { fields, onFieldChange, handleFetchModels, handleAddManualModel, handleRemoveModel, handleToggleReasoning, handleToggleImage, reset };
 }
 
 // ─── Create form ───
@@ -281,6 +294,7 @@ export function CustomProviderForm({ onAdd }: CustomProviderFormProps) {
       onAddManualModel={form.handleAddManualModel}
       onRemoveModel={form.handleRemoveModel}
       onToggleReasoning={form.handleToggleReasoning}
+      onToggleImage={form.handleToggleImage}
       onSubmit={handleSubmit}
       onCancel={handleCancel}
       submitLabel={t('common.add')}
@@ -349,6 +363,7 @@ export function CustomProviderCard({ config, apiKey, verified, onUpdate, onRemov
         onAddManualModel={form.handleAddManualModel}
         onRemoveModel={form.handleRemoveModel}
         onToggleReasoning={form.handleToggleReasoning}
+        onToggleImage={form.handleToggleImage}
         onSubmit={handleSave}
         onCancel={handleCancel}
         submitLabel={t('common.save')}

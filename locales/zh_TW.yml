@@ -243,6 +243,8 @@ chat:
     readFileFailed: "讀取失敗：$1"
     # $1 = 檔案名稱
     unsupportedFileType: "不支援的檔案類型：$1"
+    modelNoImage: "當前模型不支援多模態輸入"
+    imageStripped: "已移除圖片附件——當前模型不支援多模態輸入"
     noPrompts: "尚無 Prompt，前往 AI 設定建立"
     noMatch: "無相符結果"
     iframeEnterHint: "⏎ 點擊進入"
@@ -360,6 +362,7 @@ provider:
     models: "模型清單"
     autoFetch: "自動擷取"
     reasoning: "推理"
+    image: "多模態"
     manualModelPlaceholder: "手動輸入 Model ID"
     addCustom: "新增自訂供應商"
     fetchFailed: "無法擷取模型清單，請手動新增"

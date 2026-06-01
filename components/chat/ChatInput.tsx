@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ModelSelector } from '@/components/chat/ModelSelector';
 import { ThinkingLevelSelector } from '@/components/chat/ThinkingLevelSelector';
 import { RecordButton } from '@/components/chat/RecordButton';
@@ -91,6 +92,39 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
       return false;
     }
   }, [currentModel, customProviderList]);
+
+  // 当前模型是否支持图片（多模态/VLM）输入。统一读 pi-ai Model.input 是否包含 'image'：
+  // 自定义模型的 input 由 toModel 根据 image 字段生成，内置模型由 getModel 提供。
+  const supportsImage = useMemo(() => {
+    if (!currentModel) return false;
+
+    if (isCustomProvider(currentModel.provider)) {
+      return findCustomModel(customProviderList, currentModel.provider, currentModel.modelId)?.input?.includes('image') ?? false;
+    }
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- modelId is dynamic, pi-ai expects string literal
+      return (getModel as any)(currentModel.provider, currentModel.modelId)?.input?.includes('image') ?? false;
+    } catch {
+      return false;
+    }
+  }, [currentModel, customProviderList]);
+
+  // 异步图片生产者（截图 await、FileReader.onload）可能在用户切换到纯文本
+  // 模型之后才回调，用 ref 同步读取最新的 supportsImage，避免迟到的图片被追加。
+  const supportsImageRef = useRef(supportsImage);
+  supportsImageRef.current = supportsImage;
+
+  // 切换到不支持图片的模型时，自动剥离已有的图片附件（保留文件附件），
+  // 避免把图片发给纯文本模型导致请求异常。
+  useEffect(() => {
+    if (supportsImage) return;
+    setAttachments((prev) => {
+      if (!prev.some((a) => a.type === 'image')) return prev;
+      toast.info(t('chat.composer.imageStripped'));
+      return prev.filter((a) => a.type !== 'image');
+    });
+  }, [supportsImage]);
 
   const handleModelSelect = useCallback((provider: string, modelId: string) => {
     setCurrentModel({ provider, modelId });
@@ -461,6 +495,11 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
 
   const handleScreenshot = async () => {
     if (isDispatchingRef.current) return;
+    // 纯文本模型不支持截图（图片）输入，按钮也会被禁用，这里再兜底一次。
+    if (!supportsImage) {
+      toast.warning(t('chat.composer.modelNoImage'));
+      return;
+    }
     if (attachments.length >= MAX_ATTACHMENT_COUNT) {
       toast.warning(t('chat.composer.maxAttachments', [MAX_ATTACHMENT_COUNT]));
       return;
@@ -468,6 +507,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
     try {
       const dataUrl = await chrome.tabs.captureVisibleTab({ format: 'jpeg', quality: 85 });
       if (isDispatchingRef.current) return;
+      if (!supportsImageRef.current) return;
       const base64 = dataUrl.split(',', 2)[1] ?? '';
       setAttachments((prev) => [
         ...prev,
@@ -501,6 +541,11 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
 
     for (const file of filesToProcess) {
       if (isImageFile(file)) {
+        // 当前模型不支持多模态时，跳过图片文件（文本文件仍照常处理）。
+        if (!supportsImage) {
+          toast.warning(t('chat.composer.modelNoImage'));
+          continue;
+        }
         if (file.size > MAX_IMAGE_SIZE) {
           toast.error(t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_IMAGE_SIZE)]));
           continue;
@@ -508,6 +553,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
         const reader = new FileReader();
         reader.onload = () => {
           if (isDispatchingRef.current) return;
+          if (!supportsImageRef.current) return;
           const dataUrl = reader.result as string;
           const base64 = dataUrl.split(',', 2)[1] ?? '';
           const mimeType = file.type || 'image/png';
@@ -544,6 +590,8 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     if (isDispatchingRef.current) return;
+    // 纯文本模型不接受粘贴的图片，直接放行默认粘贴行为。
+    if (!supportsImage) return;
     const items = e.clipboardData?.items;
     if (!items || items.length === 0) return;
 
@@ -582,6 +630,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
       const reader = new FileReader();
       reader.onload = () => {
         if (isDispatchingRef.current) return;
+        if (!supportsImageRef.current) return;
         const dataUrl = reader.result as string;
         const base64 = dataUrl.split(',', 2)[1] ?? '';
         const mimeType = file.type || 'image/png';
@@ -661,9 +710,26 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
             <MousePointer2 className="size-3.5" />
           </Button>
           <RecordButton disabled={isDispatching} />
-          <Button variant="ghost" size="icon-xs" title={t('chat.composer.screenshot')} onClick={handleScreenshot} disabled={isDispatching}>
-            <Camera className="size-3.5" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                // span 包裹：按钮 disabled 时本身不接收指针事件，靠外层 span 触发 tooltip。
+                className="inline-flex"
+              >
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={handleScreenshot}
+                  disabled={isDispatching || !supportsImage}
+                >
+                  <Camera className="size-3.5" />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              {supportsImage ? t('chat.composer.screenshot') : t('chat.composer.modelNoImage')}
+            </TooltipContent>
+          </Tooltip>
           <Button variant="ghost" size="icon-xs" title={t('chat.composer.uploadFile')} onClick={() => fileInputRef.current?.click()} disabled={isDispatching}>
             <Paperclip className="size-3.5" />
           </Button>
@@ -671,7 +737,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
             ref={fileInputRef}
             type="file"
             multiple
-            accept="image/*,.txt,.md,.csv,.tsv,.log,.js,.ts,.jsx,.tsx,.mjs,.cjs,.py,.java,.c,.cpp,.h,.hpp,.go,.rs,.rb,.php,.sh,.bash,.sql,.yaml,.yml,.toml,.ini,.cfg,.json,.xml,.html,.htm,.css,.scss,.less,.env,.gitignore,.editorconfig"
+            accept={`${supportsImage ? 'image/*,' : ''}.txt,.md,.csv,.tsv,.log,.js,.ts,.jsx,.tsx,.mjs,.cjs,.py,.java,.c,.cpp,.h,.hpp,.go,.rs,.rb,.php,.sh,.bash,.sql,.yaml,.yml,.toml,.ini,.cfg,.json,.xml,.html,.htm,.css,.scss,.less,.env,.gitignore,.editorconfig`}
             className="hidden"
             disabled={isDispatching}
             onChange={handleFileUpload}
