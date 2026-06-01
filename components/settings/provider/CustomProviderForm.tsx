@@ -244,12 +244,9 @@ export function CustomProviderForm({ onAdd }: CustomProviderFormProps) {
     const { name, baseUrl, apiKey, models } = form.fields;
     if (!name.trim() || !baseUrl.trim() || models.length === 0) return;
 
-    const id = name.trim().toLowerCase()
-      .replace(/\s+/g, '-')
-      .replace(/[^a-z0-9-]/g, '')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
-    if (!id) return;
+    // id 仅作内部存储 key（custom:<id>），不展示，用 uuid 保证唯一，
+    // 避免纯中文等无 ASCII 字符的名称生成空 slug 导致添加静默失败。
+    const id = crypto.randomUUID();
 
     onAdd({
       id,
