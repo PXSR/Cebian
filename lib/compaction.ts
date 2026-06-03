@@ -70,8 +70,8 @@ export function isCompactionSummary(
  *   issue #9 中 provider 返回 400 的根因。
  * - 同时天然规避 pi `findCutPoint` 的 split-turn 复杂度：保留区永远是若干完整轮次。
  *
- * 算法移植自 pi `findCutPoint` 的「从尾部累计 token」思路，扁平化（直接吃
- * `AgentMessage[]` 而非 SessionTreeEntry）且候选切点仅限 user 消息：
+ * 算法移植自 pi `findCutPoint` 的「从尾部累计 token」思路，扁平化（直接操作
+ * `AgentMessage[]` 数组，而非 pi 的 SessionTreeEntry 树）且候选切点仅限 user 消息：
  * 1. 从最后一条消息往前累计估算 token，直到达到 keepRecentTokens，记边界 i。
  * 2. 取第一条下标 >= i 的 user 消息作切点（保留区 token 约等于预算，可能略少）。
  * 3. 若 i 之后已无 user 消息（末轮过长、无法在其内部安全切分），退取最后一条

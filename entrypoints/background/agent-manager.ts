@@ -20,7 +20,6 @@ import {
   activeModel as activeModelStorage,
   thinkingLevel as thinkingLevelStorage,
   userInstructions as userInstructionsStorage,
-  maxRounds as maxRoundsStorage,
 } from '@/lib/storage';
 import { getMCPManager } from '@/lib/mcp/manager';
 import { getCopilotBaseUrl } from '@/lib/oauth';
@@ -278,10 +277,9 @@ class AgentManager {
     const resolved = await this.resolveModelObj();
     if (!resolved) throw new Error('No model selected or model not found');
 
-    const [thinkingLvl, instructions, rounds] = await Promise.all([
+    const [thinkingLvl, instructions] = await Promise.all([
       thinkingLevelStorage.getValue(),
       userInstructionsStorage.getValue(),
-      maxRoundsStorage.getValue(),
     ]);
 
     // Use provided messages, or load from DB, or start empty
@@ -301,7 +299,6 @@ class AgentManager {
       sessionId,
       userInstructions: instructions || '',
       thinkingLevel: (thinkingLvl || 'medium') as any,
-      maxRounds: rounds || 200,
       messages,
       tools: sessionTools,
     });

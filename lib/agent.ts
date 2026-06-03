@@ -3,6 +3,7 @@ import type { Api, Model, Message } from '@earendil-works/pi-ai';
 import { providerCredentials, type OAuthCredential } from './storage';
 import { getValidOAuthToken } from './oauth';
 import { DEFAULT_SYSTEM_PROMPT } from './constants';
+import { isCompactionSummary } from './compaction';
 
 // ─── Agent factory ───
 
@@ -16,7 +17,6 @@ export interface CreateAgentOptions {
    */
   userInstructions: string;
   thinkingLevel: 'off' | 'minimal' | 'low' | 'medium' | 'high';
-  maxRounds: number;
   messages?: AgentMessage[];
   /** Session-specific tools array (includes per-session ask_user). */
   tools: AgentTool<any>[];
@@ -28,7 +28,6 @@ export function createCebianAgent(options: CreateAgentOptions): Agent {
     sessionId,
     userInstructions,
     thinkingLevel,
-    maxRounds,
     messages = [],
     tools: agentTools,
   } = options;
@@ -49,18 +48,44 @@ export function createCebianAgent(options: CreateAgentOptions): Agent {
       messages,
     },
 
-    // Convert AgentMessages to LLM messages (filter out any custom types)
+    // 把 AgentMessage 转换为发给 LLM 的 Message。compactionSummary 降级成一条
+    // user 消息（用 <summary> 包裹 + 一句「仅供参考、勿直接回应」），其余自定义
+    // 类型一律过滤掉，只保留 user / assistant / toolResult。
     convertToLlm: (msgs: AgentMessage[]): Message[] => {
-      return msgs.filter((m): m is Message =>
-        'role' in m && ['user', 'assistant', 'toolResult'].includes((m as Message).role),
-      );
+      const out: Message[] = [];
+      for (const m of msgs) {
+        if (isCompactionSummary(m)) {
+          out.push({
+            role: 'user',
+            content:
+              `<summary>\n${m.summary}\n</summary>\n\n` +
+              'The block above is a compressed summary of earlier conversation, ' +
+              'provided for context only. Do not respond to it directly; ' +
+              'continue with the messages that follow.',
+            timestamp: m.timestamp,
+          });
+          continue;
+        }
+        if ('role' in m && ['user', 'assistant', 'toolResult'].includes((m as Message).role)) {
+          out.push(m as Message);
+        }
+      }
+      return out;
     },
 
-    // Context window management: sliding window based on maxRounds
+    // 上下文窗口管理：若存在压缩摘要，则只把「最后一条摘要 + 其后的全部消息」
+    // 送给 LLM——摘要之前的历史已被该摘要覆盖，无需再发。state.messages 仍保留
+    // 完整历史（无损），此处只是 LLM 边界的视图变换，不写回 state。
     transformContext: async (msgs: AgentMessage[]): Promise<AgentMessage[]> => {
-      const limit = maxRounds * 3; // ~3 messages per round (user + assistant + potential toolResult)
-      if (msgs.length <= limit) return msgs;
-      return msgs.slice(-limit);
+      let lastSummaryIdx = -1;
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (isCompactionSummary(msgs[i])) {
+          lastSummaryIdx = i;
+          break;
+        }
+      }
+      if (lastSummaryIdx < 0) return msgs;
+      return msgs.slice(lastSummaryIdx);
     },
 
     // Dynamic API key resolution (handles OAuth token refresh)
