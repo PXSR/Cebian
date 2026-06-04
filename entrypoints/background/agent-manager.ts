@@ -1,5 +1,15 @@
 // Background Agent Manager — singleton that manages Agent instances.
 // Each session gets its own Agent + SessionToolContext (per-session isolation).
+//
+// TODO(架构重构): 当前这个类同时承担了「会话编排 + 消息同步/落库 + 广播 + 单个
+// agent 生命周期」四种职责，已接近上帝类（prompt/retry/cancel/maybeCompact 都几百行）。
+// 计划拆成两层：
+//   - SessionManager（单例）：Map<id, AgentSession>、creating 去重、keep-alive、
+//     MCP 订阅、DB gating（sessionCreated + scheduleWrite + flush）、广播注入。
+//   - AgentSession（每会话一个实例）：持有 agent + toolCtx + phase + controllers，
+//     负责单会话的 prompt/retry/cancel/compaction，通过回调把「该落库了」告诉上层。
+// 前置条件：先完成 rebuilding 简化（retry 原地复用活 agent，退役 rebuilding phase），
+// 让 AgentSession 生命周期变干净后再拆，避免「边拆边改逻辑」。详见讨论记录。
 
 import {
   Agent,
