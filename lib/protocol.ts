@@ -61,6 +61,11 @@ export type ServerMessage =
       title?: string;
       messages: AgentMessage[];
       isRunning: boolean;
+      /** 是否正处于发送前的上下文压缩步骤（状态层正在生成并插入摘要）。
+       *  为 true 时 sidepanel 显示「压缩中」指示，区别于普通的思考态。
+       *  其余广播一律缺省 / false；hook 在 `agent_start` / `agent_end` /
+       *  `error` 时清掉它。 */
+      isCompacting?: boolean;
       pendingTools?: { toolName: string; toolCallId: string; args: any }[];
     }
   | { type: 'agent_start'; sessionId: string }

@@ -1,4 +1,4 @@
-import { Bot, ChevronRight, Lightbulb, CircleHelp, CheckCircle, Send, Crosshair, FileText, Film } from 'lucide-react';
+import { Bot, ChevronRight, Lightbulb, CircleHelp, CheckCircle, Send, Crosshair, FileText, Film, FoldVertical } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, type ReactNode, type KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -80,6 +80,38 @@ export function UserMessageBubble({ msg, children }: { msg?: Message; children?:
         </div>
       )}
     </div>
+  );
+}
+
+/* ─── Compaction Divider ─── */
+/** 历史压缩分割条：标记此处之前的上下文已被折叠成摘要——发送给模型时只保留
+ *  摘要，但原始消息仍完整留在消息流里供用户向上翻阅。静态、不可折叠。
+ *  注：压缩前 token 估算已暂时隐藏（仍存于 compactionSummary.tokensBefore），
+ *  将来可能恢复展示。 */
+export function CompactionDivider() {
+  return (
+    <div className="flex items-center gap-2 my-1 select-none" role="separator">
+      <div className="h-px flex-1 bg-border" />
+      <span className="flex items-center gap-1.5 text-[0.7rem] text-muted-foreground/70 font-medium whitespace-nowrap">
+        <FoldVertical className="size-3 shrink-0" />
+        {t('chat.compaction.divider')}
+      </span>
+      <div className="h-px flex-1 bg-border" />
+    </div>
+  );
+}
+
+/* ─── Compaction Placeholder ─── */
+/** 压缩进行中的占位消息：压缩是发送前的一次独立 LLM 调用，期间复用
+ *  普通的 Cebian Agent 消息外壳 + 一行灰色斜体「正在压缩」，让它看起来就是
+ *  agent 这一轮在忙。压缩结束后 isCompacting 转 false、本条消失，由真实输出顶上；
+ *  压缩中点停止则与普通取消一致——用户气泡保留、其下显示「已取消」（后台
+ *  commitCompactionCancel 补一条 aborted 标记），本占位随 isCompacting 转 false 消失。 */
+export function CompactionPlaceholder() {
+  return (
+    <AgentMessage>
+      <span className="text-xs italic text-muted-foreground/80">{t('chat.compaction.status')}</span>
+    </AgentMessage>
   );
 }
 

@@ -338,6 +338,7 @@ export default defineBackground(() => {
               title: session?.title ?? '',
               messages: fresh.messages,
               isRunning: fresh.isRunning,
+              isCompacting: fresh.isCompacting,
               pendingTools: fresh.pendingTools,
             });
           } else {

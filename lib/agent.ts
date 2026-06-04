@@ -5,6 +5,34 @@ import { getValidOAuthToken } from './oauth';
 import { DEFAULT_SYSTEM_PROMPT } from './constants';
 import { isCompactionSummary } from './compaction';
 
+// ─── Provider credential resolution ───
+
+/**
+ * 解析某个 provider 的有效 API key：`apiKey` 凭证直接返回；`oauth` 凭证走
+ * `getValidOAuthToken`（含自动刷新）。供 agent 的 `getApiKey` 与压缩流程
+ * （agent-manager 的独立 `generateSummary` 调用）共用，避免两处复制凭证解析逻辑。
+ */
+export async function resolveProviderApiKey(
+  provider: string,
+): Promise<string | undefined> {
+  try {
+    const creds = await providerCredentials.getValue();
+    const cred = creds[provider];
+    if (!cred) return undefined;
+
+    if (cred.authType === 'apiKey') {
+      return cred.apiKey;
+    }
+
+    if (cred.authType === 'oauth') {
+      return getValidOAuthToken(provider, cred as OAuthCredential);
+    }
+  } catch (err) {
+    console.error(`[Agent] Failed to get API key for ${provider}:`, err);
+  }
+  return undefined;
+}
+
 // ─── Agent factory ───
 
 export interface CreateAgentOptions {
@@ -66,7 +94,7 @@ export function createCebianAgent(options: CreateAgentOptions): Agent {
           });
           continue;
         }
-        if ('role' in m && ['user', 'assistant', 'toolResult'].includes((m as Message).role)) {
+        if (['user', 'assistant', 'toolResult'].includes((m as Message).role)) {
           out.push(m as Message);
         }
       }
@@ -89,24 +117,8 @@ export function createCebianAgent(options: CreateAgentOptions): Agent {
     },
 
     // Dynamic API key resolution (handles OAuth token refresh)
-    getApiKey: async (provider: string): Promise<string | undefined> => {
-      try {
-        const creds = await providerCredentials.getValue();
-        const cred = creds[provider];
-        if (!cred) return undefined;
-
-        if (cred.authType === 'apiKey') {
-          return cred.apiKey;
-        }
-
-        if (cred.authType === 'oauth') {
-          return getValidOAuthToken(provider, cred as OAuthCredential);
-        }
-      } catch (err) {
-        console.error(`[Agent] Failed to get API key for ${provider}:`, err);
-      }
-      return undefined;
-    },
+    getApiKey: (provider: string): Promise<string | undefined> =>
+      resolveProviderApiKey(provider),
   };
 
   return new Agent(agentOptions);

@@ -1,10 +1,24 @@
 // Background Agent Manager — singleton that manages Agent instances.
 // Each session gets its own Agent + SessionToolContext (per-session isolation).
 
-import { Agent, type AgentEvent, type AgentMessage } from '@earendil-works/pi-agent-core';
+import {
+  Agent,
+  type AgentEvent,
+  type AgentMessage,
+  estimateContextTokens,
+  shouldCompact,
+} from '@earendil-works/pi-agent-core';
 import type { Api, AssistantMessage, Model } from '@earendil-works/pi-ai';
 import { getModels, type KnownProvider } from '@earendil-works/pi-ai';
-import { createCebianAgent } from '@/lib/agent';
+import { createCebianAgent, resolveProviderApiKey } from '@/lib/agent';
+import {
+  COMPACTION_SETTINGS,
+  findCompactionCutPoint,
+  runCompaction,
+  createCompactionSummaryMessage,
+  isCompactionSummary,
+  type CompactionSummaryMessage,
+} from '@/lib/compaction';
 import { scanSkillIndex, buildSkillsBlock } from '@/lib/ai-config/scanner';
 import { sessionStore } from './session-store';
 import { gatherPageContext } from '@/lib/page-context';
@@ -76,13 +90,20 @@ async function buildStructuredMessage(text: string, attachments: Attachment[]): 
  *   forward to `running`.
  * - `running`: the agent is actively streaming a turn. Set by the
  *   `agent_start` event, cleared by `agent_end`.
+ * - `compacting`: a context-compaction step is running before a fresh turn
+ *   is dispatched — an independent `generateSummary` LLM call that may take
+ *   several seconds. Entered by `maybeCompact()` right before `agent.prompt()`
+ *   when the context exceeds the threshold; reset back to `idle` in that
+ *   method's `finally`. Treated as "busy" everywhere (`updateKeepAlive`,
+ *   `getSessionState`, the prompt guard) so the SW stays alive and concurrent
+ *   prompts are dropped, mirroring the `rebuilding` window.
  *
  * Invariant: a session entry is in `sessions` iff its lifetime hasn't ended.
  * The previous design temporarily evicted entries during rebuild, which
  *  made `cancel()` silently no-op when it raced the rebuild window — that
  * is exactly the bug this phase machine fixes.
  */
-type ManagedPhase = 'idle' | 'rebuilding' | 'running';
+type ManagedPhase = 'idle' | 'rebuilding' | 'running' | 'compacting';
 
 interface ManagedSession {
   agent: Agent;
@@ -96,6 +117,13 @@ interface ManagedSession {
    * Cleared back to `undefined` when rebuilding ends (either success or abort).
    */
   rebuildController?: AbortController;
+  /**
+   * Set while `phase === 'compacting'`. `cancel()` aborts this signal to
+   * interrupt an in-flight `generateSummary` call; `maybeCompact()` then
+   * skips inserting the summary, resets the phase, and signals `prompt()`
+   * to abandon the turn. Cleared back to `undefined` when compaction ends.
+   */
+  compactionController?: AbortController;
   modelKey: string;
   /** Unified interactive tool bridge manager for this session. */
   toolCtx: SessionToolContext;
@@ -361,7 +389,7 @@ class AgentManager {
         break;
 
       case 'message_update':
-        if ('role' in event.message && event.message.role === 'assistant') {
+        if (event.message.role === 'assistant') {
           this.broadcast(sessionId, {
             type: 'message_update',
             sessionId,
@@ -462,16 +490,16 @@ class AgentManager {
 
     const managed = await this.getOrCreateAgent(sessionId);
 
-    if (managed.phase === 'rebuilding') {
-      // Another rebuild is already in flight (a retry, or another prompt
-      // that hit the model-switch branch). The UI gates the composer to
-      // prevent concurrent prompts, but a stale or out-of-order IPC could
-      // still arrive — without this guard, our model-switch branch below
-      // would overwrite `managed.rebuildController` and orphan the
+    if (managed.phase === 'rebuilding' || managed.phase === 'compacting') {
+      // Another rebuild OR a compaction is already in flight for this
+      // session. The UI gates the composer to prevent concurrent prompts,
+      // but a stale or out-of-order IPC could still arrive — without this
+      // guard, our model-switch branch below would overwrite
+      // `managed.rebuildController` / `compactionController` and orphan the
       // in-flight one. Silently dropping matches `retry()`'s phase-guard
-      // pattern; the in-flight rebuild's broadcasts reconcile every
-      // subscribed window to the correct state.
-      console.debug('[agent-manager] prompt: phase rebuilding, ignored', sessionId);
+      // pattern; the in-flight work's broadcasts reconcile every subscribed
+      // window to the correct state.
+      console.debug('[agent-manager] prompt: phase busy, ignored', sessionId, managed.phase);
       return;
     }
 
@@ -585,8 +613,229 @@ class AgentManager {
       managed.agent.steer(userMessage);
       managed.toolCtx.cancelAll();
     } else {
+      // 构造本轮「待投递」的用户消息，形状对齐 steering 分支。压缩成功路径不会
+      // 用它（由 agent.prompt() 自行 append 真实用户消息），它只用于压缩期间的
+      // 广播展示，以及压缩中取消时补进 state 充当「已取消」前的那条用户气泡。
+      const pendingContent: any[] = [{ type: 'text', text: enriched }];
+      if (images.length > 0) pendingContent.push(...images);
+      const pendingUserMessage: AgentMessage = {
+        role: 'user',
+        content: pendingContent,
+        timestamp: Date.now(),
+      } as AgentMessage;
+
+      // Before a fresh turn, compact the transcript if the context is over
+      // threshold (state layer: generate + insert summary + persist +
+      // broadcast). Gated on `phase === 'idle'`: a stale prompt arriving
+      // mid-run (phase 'running', no pending tool) must NOT enter compaction
+      // and clobber the phase machine — compaction is strictly a
+      // start-of-turn step. Returns true iff the compaction was cancelled
+      // mid-flight, in which case the user's stop click means we abandon this
+      // turn and don't dispatch to the model.
+      if (managed.phase === 'idle') {
+        const cancelled = await this.maybeCompact(managed, pendingUserMessage);
+        if (cancelled) return;
+      }
       await managed.agent.prompt(enriched, images.length > 0 ? images : undefined);
     }
+  }
+
+  /**
+   * Compact the session transcript before a fresh turn when the context
+   * exceeds the configured threshold.
+   *
+   * Lossless design (方案 X): the original messages stay in
+   * `agent.state.messages` forever — we only *insert* a `compactionSummary`
+   * marker at a turn-start boundary. The LLM-facing fold (keep only the last
+   * summary + everything after it) happens later in `transformContext`; this
+   * method never drops history.
+   *
+   * Flow:
+   * 1. Estimate context tokens (㊃: last assistant `usage.totalTokens` +
+   *    trailing char/4) and bail if under threshold.
+   * 2. Find a cut point aligned to a user turn-start (㊀: excludes toolResult
+   *    mid-turn — this is the root-cause fix for issue #9's orphan toolResult
+   *    → provider 400).
+   * 3. Roll the summary (③): the summarized region is the delta *since the
+   *    last summary*, and the previous summary text is fed to `generateSummary`
+   *    as `previousSummary` for an UPDATE-style merge. Multiple summaries
+   *    accumulate physically; `transformContext` only ever sends the last one.
+   * 4. On success, splice the new summary right before the cut user message
+   *    and persist. On failure (after one internal retry, ㊅), skip the
+   *    summary and send anyway — the turn-start-aligned cut guarantees no 400.
+   *
+   * Concurrency (㊆): runs under `phase === 'compacting'` with a dedicated
+   * `compactionController`. `cancel()` aborts it; the top-of-`prompt()` guard
+   * drops concurrent prompts. Keep-alive is held automatically because
+   * `phase !== 'idle'`.
+   *
+   * @param pendingUserMessage 本轮「待投递」的用户消息。压缩成功不消费它；压缩中
+   *        被取消时由 `commitCompactionCancel` 把它连同 aborted 标记补进 state，
+   *        使取消后界面与普通取消一致（用户气泡 + 「已取消」）。
+   * @returns `true` iff the compaction was cancelled and the caller should
+   *          abandon the turn; `false` otherwise (no-op skip or success).
+   */
+  private async maybeCompact(managed: ManagedSession, pendingUserMessage: AgentMessage): Promise<boolean> {
+    if (!COMPACTION_SETTINGS.enabled) return false;
+
+    const { sessionId } = managed;
+    const messages = managed.agent.state.messages;
+    const model = managed.agent.state.model;
+
+    // ㊃ token 估算：优先读最后一条 assistant 的真实 usage，尾部按 char/4 估算。
+    const { tokens } = estimateContextTokens(messages);
+    if (!shouldCompact(tokens, model.contextWindow, COMPACTION_SETTINGS)) return false;
+
+    // ㊀ 切点对齐到 user turn-start（排除 toolResult 中间），修 issue #9。
+    const cut = findCompactionCutPoint(messages, COMPACTION_SETTINGS.keepRecentTokens);
+
+    // ③ 滚动摘要：定位上一条摘要，待摘要区间是「上一条摘要之后 → 新切点」的增量
+    //（更早的历史已被旧摘要覆盖，无需重复总结），旧摘要文本作为 previousSummary
+    // 喂给 generateSummary 做 UPDATE 合并。
+    let lastSummaryIdx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (isCompactionSummary(messages[i])) {
+        lastSummaryIdx = i;
+        break;
+      }
+    }
+    // baseIdx：上一条摘要之后的起点；为 0 表示尚无摘要。
+    const baseIdx = lastSummaryIdx + 1;
+
+    // 切点未越过「上一条摘要之后」→ 自上次压缩以来没有新的可摘要历史，跳过。
+    if (cut <= baseIdx) return false;
+
+    // ① 进入 compacting 阶段：占用非 idle 状态（自动保活 + 阻止并发 prompt）。
+    // 这一步在「任何 await 之前」同步完成，把可取消的忙碌态原子地占住——否则在
+    // 解析 apiKey 的 await 窗口里若发生 cancel，会落进 idle 分支拆掉会话，导致
+    // 本方法事后往已删除的会话写入并广播（评审指出的竞态）。
+    managed.phase = 'compacting';
+    managed.compactionController = new AbortController();
+    const signal = managed.compactionController.signal;
+    this.updateKeepAlive();
+    this.broadcast(sessionId, {
+      type: 'session_state',
+      sessionId,
+      // 带上待投递的用户消息，压缩期间用户气泡保持可见（前端 session_state 全量
+      // 替换，不带就会冲掉乐观插入的气泡）。
+      messages: [...messages, pendingUserMessage],
+      isRunning: true,
+      isCompacting: true,
+      pendingTools: [],
+    });
+
+    try {
+      const apiKey = await resolveProviderApiKey(model.provider);
+      // 取消优先：apiKey 解析期间被 cancel，丢弃压缩并让调用方放弃本轮。
+      if (signal.aborted) return await this.commitCompactionCancel(managed, pendingUserMessage);
+      // 无凭证无法发起独立的摘要请求，本轮裸发、下一轮再尝试压缩（不致 400：
+      // transformContext 仍会带上已有的最后一条摘要）。
+      if (!apiKey) return false;
+
+      const previousSummary =
+        lastSummaryIdx >= 0
+          ? (messages[lastSummaryIdx] as CompactionSummaryMessage).summary
+          : undefined;
+      const messagesToSummarize = messages.slice(baseIdx, cut);
+
+      const summary = await runCompaction({
+        messagesToSummarize,
+        model,
+        apiKey,
+        previousSummary,
+        signal,
+        thinkingLevel: managed.agent.state.thinkingLevel,
+      });
+
+      // 取消：丢弃这次压缩，不插摘要，并通知调用方放弃本轮发送。
+      if (signal.aborted) return await this.commitCompactionCancel(managed, pendingUserMessage);
+
+      if (summary) {
+        // 在切点首条 user 之前插入摘要（不变式：摘要紧贴 user turn-start，
+        // 保证 truncateForRetry 与 transformContext 无需特判）。原始消息全保留。
+        const updated = [
+          ...messages.slice(0, cut),
+          createCompactionSummaryMessage(summary, tokens),
+          ...messages.slice(cut),
+        ];
+        managed.agent.state.messages = updated;
+        if (managed.sessionCreated) {
+          sessionStore.scheduleWrite(sessionId, updated);
+          await sessionStore.flush(sessionId);
+        }
+        this.broadcast(sessionId, {
+          type: 'session_state',
+          sessionId,
+          // 同样带上待投递的用户消息，避免摘要插入后到 agent.prompt() 之间
+          // 这一帧用户气泡闪掉。agent.prompt() 随后会 append 真实的同内容消息。
+          messages: [...updated, pendingUserMessage],
+          isRunning: true,
+          isCompacting: true,
+          pendingTools: [],
+        });
+      }
+      // summary 为 null → ㊅ 降级：runCompaction 内部已重试一次，这里不插摘要、
+      // 照常发送。findCompactionCutPoint 的 turn-start 对齐保证不会 400。
+      return false;
+    } finally {
+      managed.compactionController = undefined;
+      // 若仍停在 compacting（未被其他路径推进），复位回 idle。
+      if (managed.phase === 'compacting') {
+        managed.phase = 'idle';
+        this.updateKeepAlive();
+      }
+    }
+  }
+
+  /**
+   * 压缩中被取消的收尾。压缩跑在 `agent.prompt()` 之前，本轮用户消息此刻还没进
+   * `state.messages`——若直接丢弃，取消后这条消息会凭空消失。这里手动把它连同一条
+   * aborted 标记补进 state、持久化并广播，使取消后界面与普通运行中取消一致：
+   * 用户气泡保留 + 一行灰斜体「已取消」。
+   *
+   * 复用 `buildAbortedMarker` 造与 pi-agent-core `handleRunFailure` 同形状的标记，
+   * 前端 `stopReason === 'aborted'` 的渲染规则一条通吃。
+   *
+   * 若会话已被 `destroySession` 移除（它也会 abort 同一个 controller），静默退出，
+   * 不持久化/广播，避免复活刚删掉的会话行。
+   *
+   * @returns 恒为 `true` —— 调用方据此放弃本轮发送。
+   */
+  private async commitCompactionCancel(
+    managed: ManagedSession,
+    pendingUserMessage: AgentMessage,
+  ): Promise<true> {
+    const { sessionId } = managed;
+    // destroySession 先 abort 再从 map 移除；命中这里说明是销毁而非用户取消，静默退出。
+    if (!this.sessions.has(sessionId)) return true;
+
+    const finalMessages: AgentMessage[] = [
+      ...managed.agent.state.messages,
+      pendingUserMessage,
+      this.buildAbortedMarker(managed),
+    ];
+    // 同步内存态，否则下一轮 prompt 会基于缺这两条的旧 state 续写并覆盖 DB。
+    managed.agent.state.messages = finalMessages;
+
+    if (managed.sessionCreated) {
+      sessionStore.scheduleWrite(sessionId, finalMessages);
+      try {
+        await sessionStore.flush(sessionId);
+      } catch (err) {
+        console.warn(`[agent-manager] flush on compaction cancel failed for ${sessionId}:`, err);
+        // 继续广播——DB 落后可恢复，不该把停止按钮卡在界面上。
+      }
+    }
+
+    this.broadcast(sessionId, {
+      type: 'session_state',
+      sessionId,
+      messages: finalMessages,
+      isRunning: false,
+      isCompacting: false,
+      pendingTools: [],
+    });
+    return true;
   }
 
   /**
@@ -938,6 +1187,19 @@ class AgentManager {
       return;
     }
 
+    if (managed.phase === 'compacting') {
+      // A pre-turn compaction is running. Abort the in-flight
+      // `generateSummary`; `maybeCompact()` detects the abort and routes to
+      // `commitCompactionCancel()`, which commits the pending user message +
+      // an aborted marker, persists, broadcasts `isRunning: false`, and
+      // returns `true` so `prompt()` abandons the turn. No agent run exists
+      // yet, so there's nothing to `agent.abort()`. Cleanup and broadcast are
+      // the owning method's responsibility — mirrors the `rebuilding` split
+      // where cancel only signals.
+      managed.compactionController?.abort();
+      return;
+    }
+
     // phase === 'running' or 'idle' — standard teardown path.
     //
     // Snapshot message-count BEFORE abort so we can tell, after the dust
@@ -1022,6 +1284,7 @@ class AgentManager {
   getSessionState(sessionId: string): {
     messages: AgentMessage[];
     isRunning: boolean;
+    isCompacting: boolean;
     pendingTools: { toolName: string; toolCallId: string; args: any }[];
   } | null {
     const managed = this.sessions.get(sessionId);
@@ -1029,6 +1292,7 @@ class AgentManager {
     return {
       messages: [...managed.agent.state.messages],
       isRunning: managed.phase !== 'idle',
+      isCompacting: managed.phase === 'compacting',
       pendingTools: this.getPendingToolSnapshot(managed),
     };
   }
@@ -1037,6 +1301,11 @@ class AgentManager {
   destroySession(sessionId: string): void {
     const managed = this.sessions.get(sessionId);
     if (managed) {
+      // Abort an in-flight compaction so its async tail (insert summary →
+      // scheduleWrite/flush → broadcast) can't resurrect a just-deleted
+      // session row. `maybeCompact` checks `signal.aborted` after each await
+      // and bails before persisting/broadcasting.
+      managed.compactionController?.abort();
       managed.unsubscribeAgent();
       managed.toolCtx.dispose();
       managed.agent.abort();

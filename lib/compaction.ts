@@ -11,6 +11,19 @@ import {
 } from '@earendil-works/pi-agent-core';
 
 /**
+ * Cebian 的压缩配置（④：写死默认 + 留配置位）。当前直接对齐 pi 的
+ * `DEFAULT_COMPACTION_SETTINGS`，集中成一个常量而非散落的 magic number：
+ * 将来要做成用户可调设置项时，只需把这里改成读 storage，编排层
+ * （agent-manager）无需改动。
+ *
+ * - `enabled`：压缩总开关。
+ * - `reserveTokens`：为摘要提示词与输出预留的 token，同时作为 `shouldCompact`
+ *   触发阈值的安全边距（`tokens > contextWindow - reserveTokens` 时触发）。
+ * - `keepRecentTokens`：压缩后保留区的目标 token 预算，切点据此从尾部回溯。
+ */
+export const COMPACTION_SETTINGS = DEFAULT_COMPACTION_SETTINGS;
+
+/**
  * 压缩摘要消息：当会话过长触发压缩时，被压缩的历史会被一段 LLM 生成的结构化
  * 摘要替代。这条消息直接作为一条普通成员存在于 `agent.state.messages` 数组里，
  * 跟随正常的持久化 / 广播 / UI 渲染管线，无需改动存储 schema。

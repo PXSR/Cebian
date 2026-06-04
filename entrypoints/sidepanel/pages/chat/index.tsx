@@ -14,6 +14,8 @@ import {
   AgentMessage,
   AgentTextBlock,
   ThinkingBlock,
+  CompactionDivider,
+  CompactionPlaceholder,
 } from '@/components/chat/Message';
 import { ToolCard } from '@/components/chat/ToolCard';
 import { ToolCardWithUI } from '@/components/chat/ToolCardWithUI';
@@ -29,6 +31,7 @@ import {
 } from '@/lib/message-helpers';
 import { getToolLabel } from '@/lib/tools/labels';
 import { uiToolRegistry } from '@/lib/tools/ui-registry';
+import { isCompactionSummary } from '@/lib/compaction';
 import { useBackgroundAgent } from '@/hooks/useBackgroundAgent';
 import { useStickToBottom } from '@/hooks/useStickToBottom';
 import { useStorageItem } from '@/hooks/useStorageItem';
@@ -69,7 +72,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     }, [navigate]),
   });
 
-  const { messages, isAgentRunning, sessionId: activeSessionId, sessionTitle, lastError } = state;
+  const { messages, isAgentRunning, isCompacting, sessionId: activeSessionId, sessionTitle, lastError } = state;
 
   // Mirror activeSessionId into a ref so the subscribe-effect can read the
   // latest value WITHOUT re-running when activeSessionId changes. Putting
@@ -137,14 +140,15 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
   );
 
   const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
-  const showWaitingPlaceholder = effectiveRunning && lastMsg && 'role' in lastMsg && lastMsg.role === 'user';
+  // 压缩期间隐藏思考占位符，改由专门的压缩状态条提示，避免两个动效重叠。
+  const showWaitingPlaceholder = effectiveRunning && !isCompacting && lastMsg && lastMsg.role === 'user';
 
   // History of user-typed prompts in this session, oldest first; consumed by
   // ChatInput's ↑/↓ navigation. Strips the <user-request> wrapper added by
   // buildStructuredMessage so what comes back is exactly what the user typed.
   const userHistory = useMemo(
     () => messages
-      .filter((m): m is UserMessage => 'role' in m && m.role === 'user')
+      .filter((m): m is UserMessage => m.role === 'user')
       .map(extractUserText)
       .filter((s) => s.length > 0),
     [messages],
@@ -166,7 +170,11 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
           )}
 
           {!sessionLoading && messages.map((msg, idx) => {
-            if (!('role' in msg)) return null;
+            if (isCompactionSummary(msg)) {
+              return (
+                <CompactionDivider key={`compact-${idx}`} />
+              );
+            }
 
             if (msg.role === 'user') {
               return (
@@ -180,7 +188,9 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
               const text = getAssistantText(assistantMsg);
               const toolCalls = getToolCalls(assistantMsg);
               const isLast = idx === messages.length - 1;
-              const isStreaming = isLast && effectiveRunning;
+              // 压缩期间 session_state 仍带 isRunning:true，但本轮还没真正开始流式输出，
+              // 须插 !isCompacting 防止在已写完的上一条 assistant 末尾点亮流式光标。
+              const isStreaming = isLast && effectiveRunning && !isCompacting;
               const isError = assistantMsg.stopReason === 'error';
               // Aborted: either user clicked stop while streaming (pi-agent-core
               // appends the marker naturally inside `handleRunFailure`), or
@@ -193,7 +203,6 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
               let showHeader = true;
               for (let i = idx - 1; i >= 0; i--) {
                 const prev = messages[i];
-                if (!('role' in prev)) continue;
                 if (prev.role === 'toolResult') {
                   const tr = prev as ToolResultMessage;
                   const info = uiToolRegistry.get(tr.toolName);
@@ -226,7 +235,6 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                 let cacheWriteTokens = 0;
                 for (let i = idx; i >= 0; i--) {
                   const m = messages[i];
-                  if (!('role' in m)) continue;
                   if (m.role === 'user') break;
                   if (m.role === 'assistant') {
                     const am = m as AssistantMessage;
@@ -399,6 +407,9 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
           {showWaitingPlaceholder && (
             <AgentMessage isStreaming />
           )}
+
+          {/* Compaction in-progress placeholder: normal Cebian Agent shell + grey italic status */}
+          {isCompacting && <CompactionPlaceholder />}
 
           {/* Error display */}
           {lastError && !isAgentRunning && (

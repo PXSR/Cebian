@@ -303,6 +303,11 @@ chat:
     tokensInBreakdownHitWrite: "未缓存 $1 · 缓存 $2 · 写缓存 $3"
     # 最新一轮 assistant 消息左下角重试按钮的 tooltip / aria-label
     retry: "重试"
+  compaction:
+    # 历史压缩分割条上的标签
+    divider: "此前上下文已压缩"
+    # 压缩 LLM 调用进行中的底部状态条
+    status: "正在压缩上下文…"
   session:
     loading: "加载会话中…"
     modelError: "模型返回错误"

@@ -17,6 +17,9 @@ import { myInstanceId } from '@/lib/instance-id';
 export interface AgentPortState {
   messages: AgentMessage[];
   isAgentRunning: boolean;
+  /** 后台正在执行发送前的上下文压缩时为 true。用于驱动一个与普通思考态不同的
+   *  「压缩中」指示。 */
+  isCompacting: boolean;
   sessionId: string | null;
   sessionTitle: string;
   connected: boolean;
@@ -52,6 +55,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
   const [state, setState] = useState<AgentPortState>({
     messages: [],
     isAgentRunning: false,
+    isCompacting: false,
     sessionId: null,
     sessionTitle: '',
     connected: false,
@@ -111,12 +115,13 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
             ...(msg.title !== undefined ? { sessionTitle: msg.title } : {}),
             messages: msg.messages,
             isAgentRunning: msg.isRunning,
+            isCompacting: msg.isCompacting ?? false,
           }));
           break;
 
         case 'agent_start':
           if (!isCurrentSession(msg.sessionId)) break;
-          setState(prev => ({ ...prev, isAgentRunning: true }));
+          setState(prev => ({ ...prev, isAgentRunning: true, isCompacting: false }));
           break;
 
         case 'message_update':
@@ -124,7 +129,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           setState(prev => {
             const msgs = [...prev.messages];
             const last = msgs[msgs.length - 1];
-            if (last && 'role' in last && last.role === 'assistant') {
+            if (last && last.role === 'assistant') {
               msgs[msgs.length - 1] = msg.message;
             } else {
               msgs.push(msg.message);
@@ -144,6 +149,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
             ...prev,
             messages: msg.messages,
             isAgentRunning: false,
+            isCompacting: false,
           }));
           setPendingTools(new Map());
           break;
@@ -187,6 +193,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
               sessionTitle: msg.session!.title,
               messages: msg.session!.messages,
               isAgentRunning: false,
+              isCompacting: false,
             }));
           }
           callbacksRef.current.onSessionLoaded?.(msg.session);
@@ -203,7 +210,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
         case 'error':
           if (msg.sessionId && !isCurrentSession(msg.sessionId)) break;
           console.error('[AgentPort] Error:', msg.error);
-          setState(prev => ({ ...prev, isAgentRunning: false, lastError: msg.error }));
+          setState(prev => ({ ...prev, isAgentRunning: false, isCompacting: false, lastError: msg.error }));
           break;
 
         case 'recorder_status':
@@ -389,6 +396,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
         ...prev,
         messages: [...prev.messages, userMsg as any],
         isAgentRunning: true,
+        isCompacting: false,
         lastError: null,
       };
     });
@@ -457,6 +465,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
         ...prev,
         messages: truncated ?? prev.messages,
         isAgentRunning: true,
+        isCompacting: false,
         lastError: null,
       };
     });
@@ -474,6 +483,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           ...prev,
           messages: [],
           isAgentRunning: false,
+          isCompacting: false,
           sessionTitle: '',
           lastError: null,
         }
@@ -486,6 +496,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     setState({
       messages: [],
       isAgentRunning: false,
+      isCompacting: false,
       sessionId: null,
       sessionTitle: '',
       connected: true,

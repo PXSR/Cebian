@@ -303,6 +303,11 @@ chat:
     tokensInBreakdownHitWrite: "未快取 $1 · 快取 $2 · 寫快取 $3"
     # 最新一輪 assistant 訊息左下角重試按鈕的 tooltip / aria-label
     retry: "重試"
+  compaction:
+    # 歷史壓縮分割條上的標籤
+    divider: "先前上下文已壓縮"
+    # 壓縮 LLM 調用進行中的底部狀態條
+    status: "正在壓縮上下文…"
   session:
     loading: "載入工作階段…"
     modelError: "模型回傳錯誤"
