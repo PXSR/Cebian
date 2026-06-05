@@ -20,7 +20,7 @@ import {
 } from '@earendil-works/pi-agent-core';
 import type { Api, AssistantMessage, Model } from '@earendil-works/pi-ai';
 import { getModels, type KnownProvider } from '@earendil-works/pi-ai';
-import { createCebianAgent, resolveProviderApiKey } from '@/lib/agent';
+import { createCebianAgent, resolveProviderApiKey } from './agent';
 import {
   COMPACTION_SETTINGS,
   findCompactionCutPoint,
@@ -92,12 +92,13 @@ async function buildStructuredMessage(text: string, attachments: Attachment[]): 
  *
  * - `idle`: agent exists but is not running — waiting for next prompt/retry.
  *   This is the initial state and the resting state after `agent_end`.
- * - `rebuilding`: retry (or another rebuild path) is tearing down the old
- *   agent and constructing a new one. The `ManagedSession` entry stays in
- *   `sessions` throughout this phase so external operations (notably `cancel`)
- *   can still reach it; the `agent` / `toolCtx` fields may be transiently
- *   stale and must not be touched until phase flips back to `idle` or
- *   forward to `running`.
+ * - `preparing`: a request has been accepted and the session is doing async
+ *   preparation before the agent starts streaming — e.g. retry refreshing
+ *   model / instructions / messages, or a model switch. The `ManagedSession`
+ *   entry stays in `sessions` throughout this phase so external operations
+ *   (notably `cancel`) can still reach it. This phase only ever moves forward
+ *   to `running` (via the `agent_start` event) or back to `idle` (on
+ *   cancel / error) — never the reverse.
  * - `running`: the agent is actively streaming a turn. Set by the
  *   `agent_start` event, cleared by `agent_end`.
  * - `compacting`: a context-compaction step is running before a fresh turn
@@ -106,14 +107,14 @@ async function buildStructuredMessage(text: string, attachments: Attachment[]): 
  *   when the context exceeds the threshold; reset back to `idle` in that
  *   method's `finally`. Treated as "busy" everywhere (`updateKeepAlive`,
  *   `getSessionState`, the prompt guard) so the SW stays alive and concurrent
- *   prompts are dropped, mirroring the `rebuilding` window.
+ *   prompts are dropped, mirroring the `preparing` window.
  *
  * Invariant: a session entry is in `sessions` iff its lifetime hasn't ended.
  * The previous design temporarily evicted entries during rebuild, which
  *  made `cancel()` silently no-op when it raced the rebuild window — that
  * is exactly the bug this phase machine fixes.
  */
-type ManagedPhase = 'idle' | 'rebuilding' | 'running' | 'compacting';
+type ManagedPhase = 'idle' | 'preparing' | 'running' | 'compacting';
 
 interface ManagedSession {
   agent: Agent;
@@ -121,10 +122,10 @@ interface ManagedSession {
   sessionCreated: boolean;
   phase: ManagedPhase;
   /**
-   * Set while `phase === 'rebuilding'`. `cancel()` aborts this signal to
-   * interrupt a retry's async rebuild; the rebuild path checks `signal.aborted`
+   * Set while `phase === 'preparing'`. `cancel()` aborts this signal to
+   * interrupt a retry's async preparation; the retry path checks `signal.aborted`
    * at each await boundary and bails cleanly without calling `agent.continue()`.
-   * Cleared back to `undefined` when rebuilding ends (either success or abort).
+   * Cleared back to `undefined` when preparation ends (either success or abort).
    */
   rebuildController?: AbortController;
   /**
@@ -200,9 +201,10 @@ class AgentManager {
   /**
    * Acquire / release a SW keep-alive token based on whether any session
    * has active work in flight. Counts both `running` (agent streaming) and
-   * `rebuilding` (retry's async setup) so the SW doesn't suspend mid-rebuild
-   * — a suspension there would leave the session with phase='rebuilding'
-   * but no actual rebuild in flight, since phase is in-memory state.
+   * `preparing` (retry / model-switch async setup) so the SW doesn't suspend
+   * mid-preparation — a suspension there would leave the session with
+   * phase='preparing' but no actual work in flight, since phase is in-memory
+   * state.
    *
    * Uses the shared ref-counted helper in `sw-keepalive.ts` so multiple
    * subsystems (agent runs, active recordings, ...) coexist without
@@ -389,10 +391,19 @@ class AgentManager {
     switch (event.type) {
       case 'agent_start':
         // Any path that calls `agent.continue()` / `agent.prompt()` ends up
-        // here — including retry, which leaves phase='rebuilding' until this
+        // here — including retry, which leaves phase='preparing' until this
         // event flips it forward to 'running'. Direct prompt() entries go
         // 'idle' → 'running'; both transitions are valid and collapse to a
         // single line.
+        //
+        // 状态机硬约束：进入 running 的唯一入口就是本事件，且只能从
+        // preparing / idle 前进（preparing → running 单向不可逆）。其他
+        // 任何地方不准手动置 running；这里断言锁死方向。
+        if (managed.phase !== 'preparing' && managed.phase !== 'idle') {
+          console.warn(
+            `[agent-manager] agent_start from unexpected phase '${managed.phase}' for ${sessionId}`,
+          );
+        }
         managed.phase = 'running';
         this.broadcast(sessionId, { type: 'agent_start', sessionId });
         this.updateKeepAlive();
@@ -500,8 +511,8 @@ class AgentManager {
 
     const managed = await this.getOrCreateAgent(sessionId);
 
-    if (managed.phase === 'rebuilding' || managed.phase === 'compacting') {
-      // Another rebuild OR a compaction is already in flight for this
+    if (managed.phase === 'preparing' || managed.phase === 'compacting') {
+      // Another preparation OR a compaction is already in flight for this
       // session. The UI gates the composer to prevent concurrent prompts,
       // but a stale or out-of-order IPC could still arrive — without this
       // guard, our model-switch branch below would overwrite
@@ -524,7 +535,7 @@ class AgentManager {
         // so a `cancel` racing the build can find it via the phase
         // machinery instead of silently no-op'ing on a missing entry.
         const currentMessages = [...managed.agent.state.messages];
-        managed.phase = 'rebuilding';
+        managed.phase = 'preparing';
         managed.rebuildController = new AbortController();
         const signal = managed.rebuildController.signal;
         this.updateKeepAlive();
@@ -598,7 +609,7 @@ class AgentManager {
           managed.rebuildController = undefined;
           // Same finally pattern as retry: if we got here without
           // `agent_start` flipping phase forward, reset to 'idle'.
-          if (managed.phase === 'rebuilding') {
+          if (managed.phase === 'preparing') {
             managed.phase = 'idle';
             this.updateKeepAlive();
           }
@@ -881,12 +892,12 @@ class AgentManager {
     // a session not yet in the map, they all await the same in-flight
     // createAgent promise via the `creating` map, then race for the
     // synchronous phase check below. JavaScript's microtask semantics
-    // guarantee one of them flips phase to 'rebuilding' before any other
+    // guarantee one of them flips phase to 'preparing' before any other
     // awakened microtask reads it — so we don't need a separate mutex.
     const managed = await this.getOrCreateAgent(sessionId);
 
     if (managed.phase !== 'idle') {
-      // Concurrent retry already in flight (`rebuilding`) or agent currently
+      // Concurrent retry already in flight (`preparing`) or agent currently
       // streaming (`running`). Silent no-op so the duplicate window doesn't
       // see a misleading toast — the in-flight run's broadcasts reconcile
       // every subscribed window to the correct state.
@@ -897,7 +908,7 @@ class AgentManager {
     // Take the rebuild slot synchronously, BEFORE any further await. A
     // concurrent retry that wakes up after our await(s) below will hit the
     // phase guard above and bail.
-    managed.phase = 'rebuilding';
+    managed.phase = 'preparing';
     managed.rebuildController = new AbortController();
     const signal = managed.rebuildController.signal;
     this.updateKeepAlive();
@@ -1021,12 +1032,12 @@ class AgentManager {
       managed.rebuildController = undefined;
       // If the success path ran, agent_start already flipped phase to
       // 'running' (and agent_end will later flip to 'idle'). If we threw
-      // or aborted before agent_start, phase is still 'rebuilding' — reset
+      // or aborted before agent_start, phase is still 'preparing' — reset
       // it so the next retry can proceed. Note: when `handleRebuildAbort`
       // (or the catch above) ran, the entry was removed from `sessions`;
       // setting `managed.phase` on a dangling object is harmless and
       // `updateKeepAlive` correctly observes the map state.
-      if (managed.phase === 'rebuilding') {
+      if (managed.phase === 'preparing') {
         managed.phase = 'idle';
         this.updateKeepAlive();
       }
@@ -1048,7 +1059,7 @@ class AgentManager {
    * `cancel` during `phase === 'running'` (post-`continue()`) already
    * yields an aborted-stopReason assistant message naturally — pi-agent-core
    * appends it inside `handleRunFailure`. By mirroring that shape here for
-   * the `rebuilding` window, both cancel paths produce the same kind of
+   * the `preparing` window, both cancel paths produce the same kind of
    * end-state and the UI only needs one rendering rule for "this turn was
    * cancelled". The marker also prevents the `user, user` consecutive-role
    * transcript that breaks the next LLM call.
@@ -1066,7 +1077,7 @@ class AgentManager {
    * (it only flipped `signal.aborted` and called `agent.abort()`).
    * Unrelated concurrent callers during the `await flush` window ARE
    * possible but harmless: the entry is still in `sessions` with
-   * `phase === 'rebuilding'`, so `cancel()` takes its no-side-effect
+   * `phase === 'preparing'`, so `cancel()` takes its no-side-effect
    * branch and other paths queue behind existing locks.
    *
    * SW-restart during the rebuild is a different scenario: we *don't*
@@ -1154,7 +1165,7 @@ class AgentManager {
    *
    * Dispatch by phase:
    *
-   * - `rebuilding`: a `retry()` is mid-rebuild. Abort its `rebuildController`
+   * - `preparing`: a `retry()` is mid-preparation. Abort its `rebuildController`
    *   so the next signal checkpoint exits via `handleRebuildAbort`, AND
    *   call `agent.abort()` defensively in case `continue()` has already
    *   been kicked off (the post-checkpoint-3 window after `wireSubscriptions`
@@ -1188,8 +1199,8 @@ class AgentManager {
     const managed = this.sessions.get(sessionId);
     if (!managed) return;
 
-    if (managed.phase === 'rebuilding') {
-      // Signal the rebuild to bail at its next checkpoint, AND stop the
+    if (managed.phase === 'preparing') {
+      // Signal the preparation to bail at its next checkpoint, AND stop the
       // new agent if it has already entered `continue()`. Cleanup and
       // broadcast are retry()'s responsibility — see method JSDoc.
       managed.rebuildController?.abort();
@@ -1204,7 +1215,7 @@ class AgentManager {
       // an aborted marker, persists, broadcasts `isRunning: false`, and
       // returns `true` so `prompt()` abandons the turn. No agent run exists
       // yet, so there's nothing to `agent.abort()`. Cleanup and broadcast are
-      // the owning method's responsibility — mirrors the `rebuilding` split
+      // the owning method's responsibility — mirrors the `preparing` split
       // where cancel only signals.
       managed.compactionController?.abort();
       return;
@@ -1290,7 +1301,7 @@ class AgentManager {
    *  cannot accept a normal prompt yet. That includes both active streaming
    *  and rebuild windows (retry / model switch), so a reconnecting or second
    *  window keeps the composer blocked instead of dispatching a prompt the
-   *  manager would ignore while `phase === 'rebuilding'`. */
+   *  manager would ignore while `phase === 'preparing'`. */
   getSessionState(sessionId: string): {
     messages: AgentMessage[];
     isRunning: boolean;
