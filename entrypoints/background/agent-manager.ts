@@ -92,13 +92,15 @@ async function buildStructuredMessage(text: string, attachments: Attachment[]): 
  *
  * - `idle`: agent exists but is not running — waiting for next prompt/retry.
  *   This is the initial state and the resting state after `agent_end`.
- * - `preparing`: a request has been accepted and the session is doing async
- *   preparation before the agent starts streaming — e.g. retry refreshing
- *   model / instructions / messages, or a model switch. The `ManagedSession`
+ * - `preparing`: a `retry()` has been accepted and the session is doing async
+ *   preparation before the agent resumes streaming — refreshing
+ *   model / instructions / messages off storage. The `ManagedSession`
  *   entry stays in `sessions` throughout this phase so external operations
  *   (notably `cancel`) can still reach it. This phase only ever moves forward
  *   to `running` (via the `agent_start` event) or back to `idle` (on
- *   cancel / error) — never the reverse.
+ *   cancel / error) — never the reverse. (A model switch refreshes the live
+ *   agent in place during `prompt()` without entering this phase — it has no
+ *   independent resume/cancel window.)
  * - `running`: the agent is actively streaming a turn. Set by the
  *   `agent_start` event, cleared by `agent_end`.
  * - `compacting`: a context-compaction step is running before a fresh turn
@@ -111,7 +113,7 @@ async function buildStructuredMessage(text: string, attachments: Attachment[]): 
  *
  * Invariant: a session entry is in `sessions` iff its lifetime hasn't ended.
  * The previous design temporarily evicted entries during rebuild, which
- *  made `cancel()` silently no-op when it raced the rebuild window — that
+ *  made `cancel()` silently no-op when it raced the preparation window — that
  * is exactly the bug this phase machine fixes.
  */
 type ManagedPhase = 'idle' | 'preparing' | 'running' | 'compacting';
@@ -127,7 +129,7 @@ interface ManagedSession {
    * at each await boundary and bails cleanly without calling `agent.continue()`.
    * Cleared back to `undefined` when preparation ends (either success or abort).
    */
-  rebuildController?: AbortController;
+  prepareController?: AbortController;
   /**
    * Set while `phase === 'compacting'`. `cancel()` aborts this signal to
    * interrupt an in-flight `generateSummary` call; `maybeCompact()` then
@@ -139,7 +141,6 @@ interface ManagedSession {
   /** Unified interactive tool bridge manager for this session. */
   toolCtx: SessionToolContext;
   unsubscribeAgent: () => void;
-  unsubscribeToolCtx: () => void;
 }
 
 type BroadcastFn = (sessionId: string, msg: ServerMessage) => void;
@@ -201,7 +202,7 @@ class AgentManager {
   /**
    * Acquire / release a SW keep-alive token based on whether any session
    * has active work in flight. Counts both `running` (agent streaming) and
-   * `preparing` (retry / model-switch async setup) so the SW doesn't suspend
+   * `preparing` (a retry's async setup) so the SW doesn't suspend
    * mid-preparation — a suspension there would leave the session with
    * phase='preparing' but no actual work in flight, since phase is in-memory
    * state.
@@ -254,15 +255,15 @@ class AgentManager {
   }
 
   /** Get or create a managed agent for a session */
-  private async getOrCreateAgent(sessionId: string, existingMessages?: AgentMessage[]): Promise<ManagedSession> {
+  private async getOrCreateAgent(sessionId: string): Promise<ManagedSession> {
     const existing = this.sessions.get(sessionId);
-    if (existing && !existingMessages) return existing;
+    if (existing) return existing;
 
     // Guard against concurrent creation
     const pending = this.creating.get(sessionId);
-    if (pending && !existingMessages) return pending;
+    if (pending) return pending;
 
-    const promise = this.createAgent(sessionId, existingMessages);
+    const promise = this.createAgent(sessionId);
     this.creating.set(sessionId, promise);
     try {
       const managed = await promise;
@@ -273,8 +274,8 @@ class AgentManager {
   }
 
   /** Internal: actually create the agent (called only once per session). */
-  private async createAgent(sessionId: string, existingMessages?: AgentMessage[]): Promise<ManagedSession> {
-    const built = await this.buildAgentArtifacts(sessionId, existingMessages);
+  private async createAgent(sessionId: string): Promise<ManagedSession> {
+    const built = await this.buildAgentArtifacts(sessionId);
     const managed: ManagedSession = {
       agent: built.agent,
       sessionId,
@@ -283,7 +284,6 @@ class AgentManager {
       modelKey: built.modelKey,
       toolCtx: built.toolCtx,
       unsubscribeAgent: () => {},
-      unsubscribeToolCtx: () => {},
     };
     this.wireSubscriptions(managed);
     this.sessions.set(sessionId, managed);
@@ -293,21 +293,13 @@ class AgentManager {
   /**
    * Build a fresh Agent + tool context for a session without installing it
    * into the managed map or wiring subscriptions. Returns raw artifacts so
-   * the caller decides how to attach them to a `ManagedSession`:
-   *
-   * - `createAgent` constructs a brand-new managed entry and writes it to
-   *   the map.
-   * - `retry()` swaps the artifacts onto an existing managed entry that
-   *   remains in the map throughout — preserving the "cancel can always
-   *   find the entry" invariant.
-   *
-   * When `existingMessages` is provided, the returned `sessionCreated` is
-   * always `false` because we don't consult DB — callers using this path
-   * (retry) preserve the existing entry's `sessionCreated` themselves.
+   * `createAgent` can construct a brand-new managed entry and write it to the
+   * map. Messages are loaded from DB (`sessionCreated` reflects whether a row
+   * existed); the in-place retry / model-switch paths refresh the live agent
+   * directly and never go through here.
    */
   private async buildAgentArtifacts(
     sessionId: string,
-    existingMessages?: AgentMessage[],
   ): Promise<{
     agent: Agent;
     toolCtx: SessionToolContext;
@@ -322,14 +314,10 @@ class AgentManager {
       userInstructionsStorage.getValue(),
     ]);
 
-    // Use provided messages, or load from DB, or start empty
-    let messages: AgentMessage[] = existingMessages ?? [];
-    let sessionCreated = false;
-    if (!existingMessages) {
-      const existingSession = await sessionStore.load(sessionId);
-      messages = existingSession?.messages ?? [];
-      sessionCreated = !!existingSession;
-    }
+    // Load the transcript from DB; a brand-new session has no row yet.
+    const existingSession = await sessionStore.load(sessionId);
+    const messages: AgentMessage[] = existingSession?.messages ?? [];
+    const sessionCreated = !!existingSession;
 
     // Create per-session tools with isolated bridges
     const { tools: sessionTools, ctx: toolCtx } = await createSessionTools(sessionId);
@@ -353,20 +341,24 @@ class AgentManager {
 
   /**
    * Wire agent + toolCtx event subscriptions into a managed session.
-   * Replaces any previously-installed subscriptions — caller must ensure
-   * prior `unsubscribeAgent` / `unsubscribeToolCtx` were invoked first,
-   * otherwise the old listeners leak and double-fire events.
    *
-   * The subscription callbacks close over `managed`, so swapping the
-   * `agent` / `toolCtx` fields on an existing managed entry and re-wiring
-   * keeps `handleAgentEvent` pointing at the right object — there is no
-   * stale closure problem.
+   * Only ever called once per entry, from `createAgent` — the in-place
+   * retry / model-switch paths reuse the live agent and toolCtx, so there is
+   * no re-wiring. The toolCtx listener is intentionally fire-and-forget:
+   * every teardown path (`cancel`, `destroySession`) calls `toolCtx.dispose()`,
+   * which clears its listeners, so we don't keep a separate unsubscribe handle
+   * for it. The agent listener does keep `unsubscribeAgent` because teardown
+   * detaches it explicitly before disposing.
+   *
+   * The subscription callbacks close over `managed`, so the agent / toolCtx
+   * fields stay reachable as the object's own properties — there is no stale
+   * closure problem.
    */
   private wireSubscriptions(managed: ManagedSession): void {
     managed.unsubscribeAgent = managed.agent.subscribe(async (event: AgentEvent) => {
       await this.handleAgentEvent(managed, event);
     });
-    managed.unsubscribeToolCtx = managed.toolCtx.subscribe((toolName, pending) => {
+    managed.toolCtx.subscribe((toolName, pending) => {
       if (pending) {
         this.broadcast(managed.sessionId, {
           type: 'tool_pending',
@@ -538,25 +530,37 @@ class AgentManager {
         // changes made while idle. `resolveModelObj` re-reads storage to pick
         // up custom providers / copilot OAuth baseUrl exactly like agent
         // creation. If resolution fails (model deleted or credentials pulled
-        // in a parallel tab), keep the existing settings and still dispatch the
-        // turn — graceful degradation beats dropping the user's message.
+        // in a parallel tab) we throw, exactly like `buildAgentArtifacts` and
+        // `retry` do — all three model-resolution paths report the same
+        // honest error rather than silently dispatching under a stale model
+        // the user is no longer pointing at.
         const resolved = await this.resolveModelObj();
-        if (resolved) {
-          const [thinkingLvl, instructions] = await Promise.all([
-            thinkingLevelStorage.getValue(),
-            userInstructionsStorage.getValue(),
-          ]);
-          managed.agent.state.model = resolved.model;
-          managed.agent.state.thinkingLevel = (thinkingLvl || 'medium') as any;
-          managed.agent.state.systemPrompt = buildSystemPrompt(sessionId, instructions || '');
-          managed.modelKey = currentKey;
-        }
+        if (!resolved) throw new Error('No model selected or model not found');
+        const [thinkingLvl, instructions] = await Promise.all([
+          thinkingLevelStorage.getValue(),
+          userInstructionsStorage.getValue(),
+        ]);
+        managed.agent.state.model = resolved.model;
+        managed.agent.state.thinkingLevel = (thinkingLvl || 'medium') as any;
+        managed.agent.state.systemPrompt = buildSystemPrompt(sessionId, instructions || '');
+        managed.modelKey = currentKey;
       }
     }
 
     const enriched = await buildStructuredMessage(text, attachments);
 
     const images = extractImages(attachments);
+
+    // Liveness guard. Everything from `getOrCreateAgent` down to the dispatch
+    // below runs while `phase === 'idle'` (model resolve, settings reads,
+    // `buildStructuredMessage` — the latter can be slow for image
+    // attachments). A `cancel()` landing in that window takes its idle
+    // teardown branch (abort + dispose + `sessions.delete`), leaving `managed`
+    // detached. Dispatching now would steer/prompt a disposed agent, waste an
+    // API call, and let `maybeCompact`'s persist resurrect the deleted row.
+    // If the entry is gone (or was replaced), the user already stopped this
+    // turn — bail; `cancel()` already broadcast the authoritative end state.
+    if (this.sessions.get(sessionId) !== managed) return;
 
     // If any interactive tool is pending, steer the agent instead of prompting
     if (managed.toolCtx.hasPending()) {
@@ -817,7 +821,7 @@ class AgentManager {
    *
    * # Abort handling
    *
-   * `rebuildController.signal` is checked once, right before `continue()`.
+   * `prepareController.signal` is checked once, right before `continue()`.
    * If aborted, `commitRetryCancel` appends a synthetic aborted marker to
    * the truncated transcript, writes it back onto the still-live agent,
    * persists, and broadcasts `session_state { isRunning: false }`. No
@@ -848,8 +852,8 @@ class AgentManager {
     // concurrent retry that wakes up after our await(s) below will hit the
     // phase guard above and bail.
     managed.phase = 'preparing';
-    managed.rebuildController = new AbortController();
-    const signal = managed.rebuildController.signal;
+    managed.prepareController = new AbortController();
+    const signal = managed.prepareController.signal;
     this.updateKeepAlive();
     let busySnapshot: AgentMessage[] | null = null;
 
@@ -948,7 +952,7 @@ class AgentManager {
       }
       throw err;
     } finally {
-      managed.rebuildController = undefined;
+      managed.prepareController = undefined;
       // If the success path ran, agent_start already flipped phase to
       // 'running' (and agent_end will later flip to 'idle'). If we threw, or
       // bailed via `commitRetryCancel` on abort, phase is still 'preparing' —
@@ -979,7 +983,7 @@ class AgentManager {
     managed: ManagedSession,
     truncated: AgentMessage[],
   ): Promise<void> {
-    // destroySession aborts `rebuildController` then removes the entry; if we
+    // destroySession aborts `prepareController` then removes the entry; if we
     // reached here because of that (not a user cancel), bail without
     // persist/broadcast so we don't resurrect a just-deleted session row.
     // Mirrors `commitCompactionCancel`'s guard.
@@ -1011,93 +1015,12 @@ class AgentManager {
   }
 
   /**
-   * Roll back a rebuild that was aborted mid-flight by a user-initiated
-   * cancel.
-   *
-   * Called from `retry()`'s abort checkpoints. Tears down whatever live
-   * agent is currently wired onto the entry (if any), appends a synthetic
-   * "aborted" assistant marker to the truncated transcript, persists it,
-   * removes the entry from `sessions`, and broadcasts `session_state` so
-   * subscribed sidepanels show the cancel indicator and re-enable the
-   * composer.
-   *
-   * Why a marker instead of restoring the pre-retry transcript:
-   * `cancel` during `phase === 'running'` (post-`continue()`) already
-   * yields an aborted-stopReason assistant message naturally — pi-agent-core
-   * appends it inside `handleRunFailure`. By mirroring that shape here for
-   * the `preparing` window, both cancel paths produce the same kind of
-   * end-state and the UI only needs one rendering rule for "this turn was
-   * cancelled". The marker also prevents the `user, user` consecutive-role
-   * transcript that breaks the next LLM call.
-   *
-   * Marker uses the model object held on the currently-installed agent so
-   * api / provider / model fields match what the agent would have produced.
-   *
-   * Safe to delete from `sessions` here: on a successful flush, DB matches
-   * the broadcast and the next operation cold-loads consistent state. On
-   * a flush failure (caught and warned) the broadcast still announces the
-   * marker; DB lags at the bare truncated state and the user can resend
-   * — a degraded but recoverable outcome by design.
-   *
-   * The cancel that triggered this abort cannot race with our teardown
-   * (it only flipped `signal.aborted` and called `agent.abort()`).
-   * Unrelated concurrent callers during the `await flush` window ARE
-   * possible but harmless: the entry is still in `sessions` with
-   * `phase === 'preparing'`, so `cancel()` takes its no-side-effect
-   * branch and other paths queue behind existing locks.
-   *
-   * SW-restart during the rebuild is a different scenario: we *don't*
-   * run, and DB stays at the bare truncated state. Acceptable because
-   * SW-restart is infra-killed and the user didn't ask for a marker —
-   * the next interaction will overwrite the transcript anyway.
-   */
-  private async handleRebuildAbort(
-    managed: ManagedSession,
-    truncated: AgentMessage[],
-    hasWiredAgent: boolean,
-  ): Promise<void> {
-    if (hasWiredAgent) {
-      managed.toolCtx.cancelAll();
-      managed.unsubscribeAgent();
-      managed.unsubscribeToolCtx();
-      managed.toolCtx.dispose();
-    }
-
-    const finalMessages: AgentMessage[] = [
-      ...truncated,
-      this.buildAbortedMarker(managed),
-    ];
-
-    if (managed.sessionCreated) {
-      sessionStore.scheduleWrite(managed.sessionId, finalMessages);
-      try {
-        await sessionStore.flush(managed.sessionId);
-      } catch (err) {
-        console.warn(
-          `[agent-manager] flush on rebuild abort failed for ${managed.sessionId}:`,
-          err,
-        );
-        // Continue to broadcast anyway — a DB write failure shouldn't
-        // leave the UI stuck with the stop button visible.
-      }
-    }
-
-    this.sessions.delete(managed.sessionId);
-    this.broadcast(managed.sessionId, {
-      type: 'session_state',
-      sessionId: managed.sessionId,
-      messages: finalMessages,
-      isRunning: false,
-      pendingTools: [],
-    });
-  }
-
-  /**
    * Construct a synthetic `stopReason: 'aborted'` assistant message that
    * mirrors the shape pi-agent-core produces inside `handleRunFailure` when
-   * a streaming agent is aborted. Used by `handleRebuildAbort` so cancel
-   * during the rebuild window leaves the same kind of marker the running
-   * path leaves naturally.
+   * a streaming agent is aborted. Used by `commitRetryCancel` (and
+   * `commitCompactionCancel`) so cancelling during the `preparing` /
+   * `compacting` window leaves the same kind of marker the running path
+   * leaves naturally.
    *
    * Pulls model identity (api / provider / id) off the agent's current
    * state — readable on both the still-wired old agent and the
@@ -1131,17 +1054,17 @@ class AgentManager {
    *
    * Dispatch by phase:
    *
-   * - `preparing`: a `retry()` is mid-preparation. Abort its `rebuildController`
-   *   so the next signal checkpoint exits via `handleRebuildAbort`, AND
-   *   call `agent.abort()` defensively in case `continue()` has already
-   *   been kicked off (the post-checkpoint-3 window after `wireSubscriptions`
-   *   but before `agent_start` fires). `agent.abort()` is idempotent — on
-   *   a dormant or already-dead agent it's a no-op; on an in-flight agent
-   *   it stops the loop and `agent_end` broadcasts naturally through the
-   *   handler.
+   * - `preparing`: a `retry()` is mid-preparation. Abort its
+   *   `prepareController` so the single signal checkpoint exits via
+   *   `commitRetryCancel`, AND call `agent.abort()` defensively in case
+   *   `continue()` has already been kicked off (the window after the
+   *   checkpoint but before `agent_start` fires). `agent.abort()` is
+   *   idempotent — on a dormant or already-dead agent it's a no-op; on an
+   *   in-flight agent it stops the loop and `agent_end` broadcasts naturally
+   *   through the handler.
    *
    *   We deliberately do NOT touch `sessions`, dispose, or broadcast here:
-   *   `retry()`'s own cleanup flow (either `handleRebuildAbort` for the
+   *   `retry()`'s own flow (either `commitRetryCancel` for the
    *   pre-`continue()` window or the `agent_end` handler for the
    *   post-`continue()` window) owns those side effects. Duplicating them
    *   from cancel would either flicker the UI between states or double-dispose
@@ -1166,10 +1089,10 @@ class AgentManager {
     if (!managed) return;
 
     if (managed.phase === 'preparing') {
-      // Signal the preparation to bail at its next checkpoint, AND stop the
-      // new agent if it has already entered `continue()`. Cleanup and
-      // broadcast are retry()'s responsibility — see method JSDoc.
-      managed.rebuildController?.abort();
+      // Signal the preparation to bail at its checkpoint, AND stop the agent
+      // if it has already entered `continue()`. Cleanup and broadcast are
+      // retry()'s responsibility — see method JSDoc.
+      managed.prepareController?.abort();
       managed.agent.abort();
       return;
     }
@@ -1264,10 +1187,10 @@ class AgentManager {
   /** Get current state for a session (for reconnecting clients).
    *
    *  `isRunning` is the sidepanel's "busy" signal: true while the session
-   *  cannot accept a normal prompt yet. That includes both active streaming
-   *  and rebuild windows (retry / model switch), so a reconnecting or second
-   *  window keeps the composer blocked instead of dispatching a prompt the
-   *  manager would ignore while `phase === 'preparing'`. */
+   *  cannot accept a normal prompt yet. That includes active streaming, a
+   *  retry's `preparing` window, and the `compacting` window, so a
+   *  reconnecting or second window keeps the composer blocked instead of
+   *  dispatching a prompt the manager would ignore while `phase !== 'idle'`. */
   getSessionState(sessionId: string): {
     messages: AgentMessage[];
     isRunning: boolean;
@@ -1295,7 +1218,7 @@ class AgentManager {
       // each await and bail via an entry-presence guard before persisting or
       // broadcasting.
       managed.compactionController?.abort();
-      managed.rebuildController?.abort();
+      managed.prepareController?.abort();
       managed.unsubscribeAgent();
       managed.toolCtx.dispose();
       managed.agent.abort();

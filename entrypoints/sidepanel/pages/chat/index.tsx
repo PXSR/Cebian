@@ -194,8 +194,8 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
               const isError = assistantMsg.stopReason === 'error';
               // Aborted: either user clicked stop while streaming (pi-agent-core
               // appends the marker naturally inside `handleRunFailure`), or
-              // user clicked stop while retry was rebuilding (the background's
-              // `handleRebuildAbort` appends the same shape manually). One
+              // user clicked stop while a retry was preparing (the background's
+              // `commitRetryCancel` appends the same shape manually). One
               // rendering rule covers both paths.
               const isAborted = assistantMsg.stopReason === 'aborted';
 
