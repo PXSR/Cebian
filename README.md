@@ -8,6 +8,10 @@
 
 English | **[简体中文](./README.zh-CN.md)**
 
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/dnfmklmdbipiahdjiogaoemjaiodomdf?style=for-the-badge&logo=googlechrome&logoColor=white&label=Chrome&labelColor=2B2B2B&color=4285F4)](https://chromewebstore.google.com/detail/dnfmklmdbipiahdjiogaoemjaiodomdf)
+[![Edge Add-on](https://img.shields.io/badge/dynamic/json?style=for-the-badge&logo=microsoftedge&logoColor=white&label=Edge&labelColor=2B2B2B&color=0078D7&query=%24.version&url=https%3A%2F%2Fmicrosoftedge.microsoft.com%2Faddons%2Fgetproductdetailsbycrxid%2Fkakfgcmbiacmclkjboijakkhlhioopcd)](https://microsoftedge.microsoft.com/addons/detail/kakfgcmbiacmclkjboijakkhlhioopcd)
+[![GitHub Release](https://img.shields.io/github/v/release/maotoumao/Cebian?style=for-the-badge&logo=github&logoColor=white&label=Release&labelColor=2B2B2B&color=2EA043)](https://github.com/maotoumao/Cebian/releases)
+
 </div>
 
 ---
