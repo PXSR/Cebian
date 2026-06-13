@@ -79,8 +79,8 @@ export function MessageMetaRow({
   // alone (the meta span is omitted, not just emptied).
   return (
     <div className="mt-2 flex items-center gap-2 text-[0.7rem] text-muted-foreground/70">
-      {text && getSpeakText && <SpeakButton getText={getSpeakText} />}
       {text && <CopyButton text={text} />}
+      {text && getSpeakText && <SpeakButton getText={getSpeakText} />}
       {onRetry && (
         <Tooltip>
           <TooltipTrigger asChild>

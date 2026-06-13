@@ -98,7 +98,7 @@ function FollowAuthorSection() {
     <div className="space-y-3">
       <div className="flex items-center gap-3">
         <p className="text-sm font-medium">{t('settings.about.followAuthor')}</p>
-        <div className="h-px flex-1 bg-gradient-to-r from-border to-transparent" />
+        <div className="h-px flex-1 bg-linear-to-r from-border to-transparent" />
       </div>
       <div className="grid grid-cols-2 gap-2">
         {SOCIAL_LINKS.map((link) => (
