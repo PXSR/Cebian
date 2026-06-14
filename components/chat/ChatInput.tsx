@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback, type KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback, useImperativeHandle, forwardRef, type KeyboardEvent } from 'react';
 import { Send, Square, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, FileText, X, FileType, Film } from 'lucide-react';
 import { showDialog } from '@/lib/ui/dialog';
 import { toast } from 'sonner';
@@ -48,7 +48,16 @@ interface ChatInputProps {
   sessionId?: string | null;
 }
 
-export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, userHistory, sessionId }: ChatInputProps) {
+/** 暴露给父组件的 imperative handle：允许欢迎页等外部入口填入文本并聚焦输入框，
+ *  同时仍由 ChatInput 持有 value 状态。 */
+export interface ChatInputHandle {
+  fill: (text: string) => void;
+}
+
+export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
+  { onSend, onOpenSettings, isAgentRunning, onCancel, userHistory, sessionId },
+  ref,
+) {
   const [value, setValue] = useState('');
   const [showSlash, setShowSlash] = useState(false);
   const [prompts, setPrompts] = useState<PromptMeta[]>([]);
@@ -387,6 +396,22 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
     // Manual edits exit history mode — the new content becomes the draft.
     if (historyIndex !== null) setHistoryIndex(null);
   };
+
+  // 由外部（欢迎页示例卡片）填入文本并聚焦，不夺走输入框对 value 的所有权。
+  const fill = useCallback((text: string) => {
+    setValue(text);
+    setShowSlash(text.startsWith('/'));
+    setHistoryIndex(null);
+    // 等 value 提交后再聚焦并把光标移到末尾，方便用户接着改。
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    });
+  }, []);
+
+  useImperativeHandle(ref, () => ({ fill }), [fill]);
 
   // Scan prompts when slash menu opens
   useEffect(() => {
@@ -905,4 +930,4 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
       </div>
     </footer>
   );
-}
+});

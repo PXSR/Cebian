@@ -98,6 +98,7 @@ function App() {
         {!location.pathname.startsWith('/settings') && (
           <Header
             title={chatTitle}
+            isNewChat={location.pathname === '/chat/new'}
             theme={theme}
             onToggleTheme={toggleTheme}
             onOpenSettings={() => navigate('/settings')}

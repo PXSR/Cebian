@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { SquarePen, ArrowDown } from 'lucide-react';
+import { ArrowDown } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
@@ -8,7 +8,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { ChatInput } from '@/components/chat/ChatInput';
+import { ChatInput, type ChatInputHandle } from '@/components/chat/ChatInput';
+import { WelcomeScreen } from '@/components/chat/WelcomeScreen';
 import {
   UserMessageBubble,
   AgentMessage,
@@ -51,6 +52,9 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
 
   // Only read activeModel for UI display (is a model selected?)
   const [currentModel] = useStorageItem(activeModel, null);
+
+  // 句柄：欢迎页示例卡片通过它把 prompt 填入输入框。
+  const inputRef = useRef<ChatInputHandle>(null);
 
   // ─── Agent port (all agent/session logic via background) ───
   const {
@@ -443,16 +447,11 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
           )}
 
           {!sessionLoading && messages.length === 0 && !isAgentRunning && (
-            <div className="flex flex-col items-center gap-3 pt-24 pb-12 text-center">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 grid place-items-center">
-                <SquarePen className="size-5 text-primary" />
-              </div>
-              {!currentModel ? (
-                <p className="text-sm text-muted-foreground">{t('chat.composer.needModel')}</p>
-              ) : (
-                <p className="text-sm text-muted-foreground">{t('chat.session.welcomeReady')}</p>
-              )}
-            </div>
+            <WelcomeScreen
+              hasModel={!!currentModel}
+              onPickExample={(prompt) => inputRef.current?.fill(prompt)}
+              onOpenSettings={() => onOpenSettings?.()}
+            />
           )}
         </div>
       </ScrollArea>
@@ -476,6 +475,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
       </div>
 
       <ChatInput
+        ref={inputRef}
         onSend={handleSend}
         onCancel={cancel}
         isAgentRunning={effectiveRunning}

@@ -9,6 +9,8 @@ import { t } from '@/lib/i18n';
 
 interface HeaderProps {
   title?: string;
+  /** 是否处于新会话路由（/chat/new）。新会话且无标题时，标题位回落显示品牌名。 */
+  isNewChat?: boolean;
   theme: 'dark' | 'light' | 'system';
   onToggleTheme: () => void;
   onOpenSettings: () => void;
@@ -16,7 +18,7 @@ interface HeaderProps {
   onOpenHistory: () => void;
 }
 
-export function Header({ title, theme, onToggleTheme, onOpenSettings, onNewChat, onOpenHistory }: HeaderProps) {
+export function Header({ title, isNewChat, theme, onToggleTheme, onOpenSettings, onNewChat, onOpenHistory }: HeaderProps) {
   return (
     <header className="flex items-center justify-between px-5 py-4 border-b border-border bg-background/80 backdrop-blur-xl z-10">
       <div className="flex items-center gap-2">
@@ -40,7 +42,7 @@ export function Header({ title, theme, onToggleTheme, onOpenSettings, onNewChat,
       </div>
 
       <span className="flex-1 text-center text-sm font-medium truncate px-2">
-        {title}
+        {title || (isNewChat ? 'Cebian' : '')}
       </span>
 
       <div className="flex gap-2">
