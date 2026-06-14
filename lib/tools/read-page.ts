@@ -872,6 +872,38 @@ function truncate(text: string, maxLength: number): string {
   return text.slice(0, maxLength) + `\n\n...(truncated at ${maxLength} chars)`;
 }
 
+/**
+ * 清洗模型偶发笔误产生的脏 selector：去掉整体包裹引号或落单的悬挂引号。
+ * https://github.com/maotoumao/Cebian/issues/12
+ *
+ * 不干扰合法 selector：合法 selector 不会以引号开头，其内部引号只出现在 [attr="..."]
+ * 内且必然成对（偶数）——所以「首尾同引号」「奇数个引号」都只可能是非法输入。
+ */
+function sanitizeSelector(raw: string): string {
+  let s = raw.trim();
+
+  // 含反斜杠说明用到了 CSS 转义（如 CSS.escape 把引号写成 \"），引号奇偶性不可靠，
+  // 不能动；而多吐引号的笔误从不含反斜杠，直接跳过。
+  if (s.includes('\\')) return s;
+
+  // 1) 落单的悬挂引号：奇数次出现且位于首或尾。
+  //    先处理它，'"#main" 这类「悬挂 + 包裹」叠加的脏输入才能被还原。
+  for (const q of ['"', "'"]) {
+    const count = s.split(q).length - 1;
+    if (count % 2 === 1) {
+      if (s.endsWith(q)) s = s.slice(0, -1).trim();
+      else if (s.startsWith(q)) s = s.slice(1).trim();
+    }
+  }
+
+  // 2) 整体包裹引号：首尾是同一个引号字符。
+  if (s.length >= 2 && (s[0] === '"' || s[0] === "'") && s[s.length - 1] === s[0]) {
+    s = s.slice(1, -1).trim();
+  }
+
+  return s;
+}
+
 // ─── Tool definition ───
 
 export const readPageTool: AgentTool<typeof ReadPageParameters> = {
@@ -893,6 +925,7 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
     const tabId = params.tabId;
     const mode = params.mode ?? 'markdown';
     const maxLength = params.maxLength ?? 20000;
+    const selector = params.selector != null ? sanitizeSelector(params.selector) : null;
 
     // ── PDF short-circuit ──
     // Chrome's built-in PDF viewer renders text to canvas, so injecting
@@ -918,26 +951,26 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
 
     switch (mode) {
       case 'text': {
-        content = await executeInTabWithArgs(tabId, extractText, [params.selector ?? null], params.frameId);
+        content = await executeInTabWithArgs(tabId, extractText, [selector], params.frameId);
         break;
       }
       case 'html': {
-        content = await executeInTabWithArgs(tabId, extractHtml, [params.selector ?? null], params.frameId);
+        content = await executeInTabWithArgs(tabId, extractHtml, [selector], params.frameId);
         break;
       }
       case 'markdown': {
         // Full-page cleaned HTML → markdown via offscreen document
-        const html = await executeInTabWithArgs(tabId, extractCleanHtml, [params.selector ?? null], params.frameId);
+        const html = await executeInTabWithArgs(tabId, extractCleanHtml, [selector], params.frameId);
         content = await convertHtmlToMarkdown(html);
         break;
       }
       case 'outline': {
-        content = await executeInTabWithArgs(tabId, extractOutline, [params.selector ?? null], params.frameId);
+        content = await executeInTabWithArgs(tabId, extractOutline, [selector], params.frameId);
         break;
       }
       case 'article': {
-        if (params.selector) {
-          const html = await executeInTabWithArgs(tabId, extractCleanHtml, [params.selector], params.frameId);
+        if (selector) {
+          const html = await executeInTabWithArgs(tabId, extractCleanHtml, [selector], params.frameId);
           content = await convertHtmlToMarkdown(html);
           break;
         }
@@ -953,7 +986,7 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
         break;
       }
       default:
-        content = await executeInTabWithArgs(tabId, extractText, [params.selector ?? null], params.frameId);
+        content = await executeInTabWithArgs(tabId, extractText, [selector], params.frameId);
     }
 
     // ── outputPath branch ──
@@ -979,3 +1012,6 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
     };
   },
 };
+
+// 仅为单测暴露的内部 helper
+export { sanitizeSelector };
