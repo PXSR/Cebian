@@ -107,7 +107,7 @@ export async function restoreStorage(
   // ── 步骤 1：写 settings 的 safe 配置 ──
   // replace：用备份 safe 覆盖。
   // merge：仅对声明了 `fillMissing` 的 item 做「按 id 补缺」（如 customProviders /
-  //        mcpServers 列表）；未声明的标量（theme / maxRounds 等）保留本地、不写。
+  //        mcpServers 列表）；未声明的标量（theme / thinkingLevel 等）保留本地、不写。
   if (plan.settings) {
     for (const entry of BACKUP_REGISTRY) {
       if (entry.storageClass !== 'settings') continue;

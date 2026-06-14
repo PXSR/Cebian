@@ -11,7 +11,6 @@ import {
   activeModel,
   customProviders,
   userInstructions,
-  maxRounds,
   themePreference,
   thinkingLevel,
   mcpServers,
@@ -215,7 +214,6 @@ export const BACKUP_REGISTRY: BackupEntry<any>[] = [
       fillMissingById(local, backup, (p) => p.id),
   }),
   entry({ item: userInstructions, storageClass: 'settings' }),
-  entry({ item: maxRounds, storageClass: 'settings' }),
   entry({ item: themePreference, storageClass: 'settings' }),
   entry({ item: thinkingLevel, storageClass: 'settings' }),
   entry({

@@ -2,13 +2,15 @@ import { useEffect, type ReactNode } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { SettingsLayout } from '@/components/settings/SettingsLayout';
+import { SETTINGS_SECTIONS } from '@/components/settings/SectionNav';
 import { ProvidersSection } from '@/components/settings/sections/ProvidersSection';
 import { InstructionsSection } from '@/components/settings/sections/InstructionsSection';
 import { PromptsSection } from '@/components/settings/sections/PromptsSection';
 import { SkillsSection } from '@/components/settings/sections/SkillsSection';
 import { MCPSection } from '@/components/settings/sections/MCPSection';
 import { BackupSection } from '@/components/settings/sections/BackupSection';
-import { AdvancedSection } from '@/components/settings/sections/AdvancedSection';
+// 高级设置暂时停用（导航入口同步注释，见 components/settings/SectionNav.tsx）。
+// import { AdvancedSection } from '@/components/settings/sections/AdvancedSection';
 import { AboutSection } from '@/components/settings/sections/AboutSection';
 import { lastSettingsSection } from '@/lib/persistence/storage';
 
@@ -40,7 +42,8 @@ export function SettingsRoutes({ basePath, showBackButton = false, showOpenInTab
         <Route path="skills/*" element={<SkillsSection />} />
         <Route path="mcp" element={<MCPSection />} />
         <Route path="backup" element={<BackupSection />} />
-        <Route path="advanced" element={<AdvancedSection />} />
+        {/* Advanced settings temporarily disabled; restore once new options land (see SectionNav.tsx). */}
+        {/* <Route path="advanced" element={<AdvancedSection />} /> */}
         <Route path="about" element={<AboutSection />} />
         <Route path="*" element={<Navigate to="." replace />} />
       </Route>
@@ -51,5 +54,8 @@ export function SettingsRoutes({ basePath, showBackButton = false, showOpenInTab
 /** Redirects /settings to the last-visited section (fallback handled by storage item). */
 function SettingsIndexRedirect(): ReactNode {
   const [target] = useStorageItem(lastSettingsSection, 'providers');
-  return <Navigate to={target} replace />;
+  // 校验存储值仍指向一个有效 section：旧版本可能存了已停用的入口（如 'advanced'），
+  // 直接重定向过去会命中 wildcard 路由回弹索引，造成循环。无效时回落到 providers。
+  const valid = SETTINGS_SECTIONS.some((s) => s.path === target);
+  return <Navigate to={valid ? target : 'providers'} replace />;
 }

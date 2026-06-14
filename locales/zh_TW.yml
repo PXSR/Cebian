@@ -108,9 +108,6 @@ settings:
       xHandle: "@maotoumao0_0"
   advanced:
     title: "進階"
-    maxRounds:
-      label: "最大對話輪數"
-      hint: "超出後自動截斷早期訊息"
   instructions:
     title: "指引"
     label: "自訂指引"
@@ -467,6 +464,16 @@ chat:
     # 自動重連多次失敗後提示。語氣是「還在試」，不保證能連上
     reconnecting: "連線中斷，正在重試…"
     welcomeReady: "有什麼我可以幫忙的？"
+    # 新工作階段空狀態裡的示例卡片。*Title 是卡片上的短標題，*Prompt 是點擊後
+    # 填入輸入框的完整文案（使用者可改後再發）。
+    exampleSummarizeTitle: "總結目前頁面"
+    exampleSummarizePrompt: "請閱讀目前頁面的內容，用簡潔的要點總結它的核心資訊。"
+    exampleTranslateTitle: "翻譯目前頁面"
+    exampleTranslatePrompt: "請把目前頁面的主要內容翻譯成繁體中文，保留原有結構。"
+    exampleExtractTitle: "擷取頁面要點"
+    exampleExtractPrompt: "請從目前頁面中擷取關鍵資訊（標題、要點、重要連結），整理成清單。"
+    exampleTabsTitle: "整理我的分頁"
+    exampleTabsPrompt: "請看看我目前開了哪些分頁，依主題幫我歸類，並指出可以關掉的重複頁面。"
     scrollToBottom: "跳至最新訊息"
 
 # ─── 供應商子元件（OAuth / API Key / 自訂）───

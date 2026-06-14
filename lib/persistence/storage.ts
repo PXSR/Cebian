@@ -134,11 +134,6 @@ export const userInstructions = storage.defineItem<string>(
   { fallback: '' },
 );
 
-export const maxRounds = storage.defineItem<number>(
-  'local:maxRounds',
-  { fallback: 200 },
-);
-
 /** Width of the file-tree panel inside FileWorkspace (Prompts / Skills sections). */
 export const settingsFilePanelWidth = storage.defineItem<number>(
   'local:settingsFilePanelWidth',

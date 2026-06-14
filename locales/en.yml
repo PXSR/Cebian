@@ -112,9 +112,6 @@ settings:
       xHandle: "@maotoumao0_0"
   advanced:
     title: "Advanced"
-    maxRounds:
-      label: "Max conversation rounds"
-      hint: "Older messages are truncated when exceeded"
   instructions:
     title: "Instructions"
     label: "Custom instructions"
@@ -479,6 +476,17 @@ chat:
     # success. Hints that recovery is in progress, doesn't promise a fix.
     reconnecting: "Connection lost, retrying…"
     welcomeReady: "What can I help you with?"
+    # Example prompt cards shown in the new-chat empty state. The *Title is
+    # the short card label; the *Prompt is the full text dropped into the
+    # composer when the card is clicked (user can edit before sending).
+    exampleSummarizeTitle: "Summarize this page"
+    exampleSummarizePrompt: "Read the content of the current page and summarize its key points concisely."
+    exampleTranslateTitle: "Translate this page"
+    exampleTranslatePrompt: "Translate the main content of the current page into English, keeping the original structure."
+    exampleExtractTitle: "Extract key points"
+    exampleExtractPrompt: "Extract the key information from the current page (title, main points, important links) and organize it into a list."
+    exampleTabsTitle: "Organize my tabs"
+    exampleTabsPrompt: "Take a look at the tabs I currently have open, group them by topic, and point out any duplicate pages I can close."
     scrollToBottom: "Jump to latest"
 
 # ─── Provider sub-components (OAuth / API Key / custom) ───
