@@ -1,5 +1,5 @@
-import { customProviders, providerCredentials, activeModel } from '@/lib/storage';
-import { customProviderKey } from '@/lib/custom-models';
+import { customProviders, providerCredentials, activeModel } from '@/lib/persistence/storage';
+import { customProviderKey } from '@/lib/providers/custom-models';
 
 // ─── Dev-only storage seed ───
 //

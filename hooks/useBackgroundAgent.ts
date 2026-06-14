@@ -3,15 +3,15 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
-import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage, type SessionMeta } from '@/lib/protocol';
-import type { SessionRecord } from '@/lib/db';
-import type { Attachment } from '@/lib/attachments';
-import type { PermissionRequest } from '@/lib/tool-permissions';
-import { truncateForRetry } from '@/lib/message-helpers';
+import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage, type SessionMeta } from '@/lib/ipc/protocol';
+import type { SessionRecord } from '@/lib/persistence/db';
+import type { Attachment } from '@/lib/agent/attachments';
+import type { PermissionRequest } from '@/lib/agent/tool-permissions';
+import { truncateForRetry } from '@/lib/agent/message-helpers';
 import { t } from '@/lib/i18n';
 import { recorderChannel } from '@/lib/recorder/sidepanel-channel';
 import { mcpAppResourceChannel } from '@/lib/mcp/sidepanel-channel';
-import { myInstanceId } from '@/lib/instance-id';
+import { myInstanceId } from '@/lib/ipc/instance-id';
 
 // ─── State ───
 
@@ -35,7 +35,7 @@ export interface PendingToolInfo {
   args: any;
 }
 
-// 权限提示卡片的请求形状（PermissionRequest）来自 @/lib/tool-permissions，
+// 权限提示卡片的请求形状（PermissionRequest）来自 @/lib/agent/tool-permissions，
 // UI 需要时直接从那里 import；本 hook 仅在内部按 toolCallId 维护活 pending。
 
 export type PromptDispatchResult =

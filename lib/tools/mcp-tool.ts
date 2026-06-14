@@ -1,6 +1,6 @@
 import type { TSchema } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
-import type { MCPServerConfig } from '@/lib/storage';
+import type { MCPServerConfig } from '@/lib/persistence/storage';
 import type { MCPTool } from '@/lib/mcp/client';
 import { getMCPManager, ThrottleError } from '@/lib/mcp/manager';
 

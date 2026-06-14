@@ -1,5 +1,5 @@
-import { providerCredentials, type OAuthCredential, type ProviderCredentials } from '@/lib/storage';
-import { refreshOAuthCredential } from '@/lib/oauth';
+import { providerCredentials, type OAuthCredential, type ProviderCredentials } from '@/lib/persistence/storage';
+import { refreshOAuthCredential } from '@/lib/providers/oauth';
 
 const ALARM_NAME = 'oauth-refresh';
 const REFRESH_INTERVAL_MINUTES = 10;

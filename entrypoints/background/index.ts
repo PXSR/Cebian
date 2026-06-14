@@ -5,10 +5,10 @@ import { recorder } from './recorder';
 import { seedDevStorage } from './dev-seed';
 import { registerBackupHandler } from './backup-handler';
 import { getMCPManager } from '@/lib/mcp/manager';
-import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage } from '@/lib/protocol';
+import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage } from '@/lib/ipc/protocol';
 import { isRecorderRuntimeMessage, RECORDER_MSG_KIND, type RecorderControlMessage } from '@/lib/recorder/protocol';
-import { isInjectablePage } from '@/lib/tab-helpers';
-import { vfs } from '@/lib/vfs';
+import { isInjectablePage } from '@/lib/browser/tab-actions';
+import { vfs } from '@/lib/persistence/vfs';
 import { isValidSessionId } from '@/lib/utils';
 
 /**

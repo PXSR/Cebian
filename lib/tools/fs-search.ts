@@ -1,7 +1,7 @@
 import { Type } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { TOOL_FS_SEARCH } from '@/lib/tools/names';
-import { vfs } from '@/lib/vfs';
+import { vfs } from '@/lib/persistence/vfs';
 import { walkDir, globMatch, isBinaryContent, MAX_SEARCH_RESULTS } from './fs-helpers';
 
 const FsSearchParameters = Type.Object({

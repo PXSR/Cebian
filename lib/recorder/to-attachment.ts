@@ -11,7 +11,7 @@ import type { RecordedEvent, RecordedSession } from './types';
 import {
   MAX_RECORDING_SIZE,
   type RecordingAttachment,
-} from '@/lib/attachments';
+} from '@/lib/agent/attachments';
 import { randomId } from '@/lib/utils';
 
 /** Pad number to 2 digits. */

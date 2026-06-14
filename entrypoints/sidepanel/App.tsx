@@ -8,7 +8,7 @@ import { UpdateNoticeOutlet } from '@/components/dialogs/update-notice-outlet';
 import { Header } from '@/components/layout/Header';
 import { HistoryPanel } from '@/components/layout/HistoryPanel';
 import { useStorageItem } from '@/hooks/useStorageItem';
-import { themePreference } from '@/lib/storage';
+import { themePreference } from '@/lib/persistence/storage';
 import { ChatPage } from './pages/chat';
 
 // Lazy-load Settings: pulls in CodeMirror, react-arborist, lightning-fs,

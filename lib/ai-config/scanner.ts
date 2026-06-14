@@ -6,10 +6,40 @@
 //
 // Skill index is cached in-memory with a 30-minute TTL and can be proactively invalidated.
 //
-import { vfs, normalizePath } from '@/lib/vfs';
-import { CEBIAN_PROMPTS_DIR, CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE, SKILLS_PREAMBLE } from '@/lib/constants';
+import { vfs, normalizePath } from '@/lib/persistence/vfs';
+import { CEBIAN_PROMPTS_DIR, CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE } from '@/lib/persistence/vfs-paths';
 import { escapeXml } from '@/lib/utils';
-import { parseFrontmatter } from '@/lib/frontmatter';
+import { parseFrontmatter } from '@/lib/content/frontmatter';
+
+// ─── Skills preamble (injected into <agent-config>) ───
+
+const SKILLS_PREAMBLE = `Skills are vetted, domain-specific instruction packs. Each skill folder contains rules
+(naming, structure, required fields, trigger conditions) the native tools alone do not encode.
+
+Before acting on a user request, scan the <skill> entries below and decide:
+
+A clear match exists when EITHER of the following is true:
+  • a token in the skill's name appears (in any language, including transliteration —
+    e.g. "\u767e\u5ea6" matches "baidu", "\u641c\u7d22" matches "search") in the user's request, OR
+  • the user's request is a concrete instance of the action the description names.
+
+matched-url metadata, when present, only filters out skills whose glob does not
+cover the active tab — it never makes a skill match on its own.
+
+When there is a clear match, fs_read_file the skill's SKILL.md FIRST, then follow it —
+even when native tools (interact, execute_js, chrome_api, etc.) look sufficient. The
+skill exists because the naive native-tool path gets details wrong (selectors, ordering,
+required parameters, output format).
+
+When no entry matches, proceed with native tools. Do not open SKILL.md speculatively.
+
+If you are unsure whether a skill matches, prefer reading it over skipping it: a single
+fs_read_file is cheaper than asking the user a clarifying question or producing a wrong
+result.
+
+A skill is a directory. When SKILL.md tells you to use a sibling file (assets/,
+references/, scripts/), fs_read_file it before acting — SKILL.md only describes those
+files abstractly.`;
 
 // ─── Types ───
 

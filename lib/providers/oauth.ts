@@ -12,7 +12,7 @@ import {
   getGitHubCopilotBaseUrl,
   normalizeDomain,
 } from '@earendil-works/pi-ai/oauth';
-import { providerCredentials, type OAuthCredential } from './storage';
+import { providerCredentials, type OAuthCredential } from '@/lib/persistence/storage';
 import { t } from '@/lib/i18n';
 
 // ─── PKCE (Web Crypto) ───

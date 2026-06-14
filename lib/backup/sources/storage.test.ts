@@ -15,7 +15,7 @@ import {
   type MCPServerConfig,
   type ProviderCredentials,
   type CustomProviderConfig,
-} from '@/lib/storage';
+} from '@/lib/persistence/storage';
 
 const SK = {
   activeModel: 'local:activeModel',

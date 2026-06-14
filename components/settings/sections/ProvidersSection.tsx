@@ -13,10 +13,10 @@ import {
   type OAuthCredential,
   type ProviderCredentials,
   type CustomProviderConfig,
-} from '@/lib/storage';
-import { OAUTH_PROVIDERS, APIKEY_PROVIDERS } from '@/lib/constants';
-import { customProviderKey } from '@/lib/custom-models';
-import { loginGitHubCopilot, loginOpenAICodex } from '@/lib/oauth';
+} from '@/lib/persistence/storage';
+import { OAUTH_PROVIDERS, APIKEY_PROVIDERS } from '@/lib/providers/registry';
+import { customProviderKey } from '@/lib/providers/custom-models';
+import { loginGitHubCopilot, loginOpenAICodex } from '@/lib/providers/oauth';
 import { t } from '@/lib/i18n';
 
 /**

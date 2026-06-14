@@ -1,13 +1,13 @@
 import { Type, type Static } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { TOOL_RUN_SKILL } from '@/lib/tools/names';
-import { CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE } from '@/lib/constants';
-import { vfs, normalizePath } from '@/lib/vfs';
-import { parseFrontmatter } from '@/lib/frontmatter';
+import { CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE } from '@/lib/persistence/vfs-paths';
+import { vfs, normalizePath } from '@/lib/persistence/vfs';
+import { parseFrontmatter } from '@/lib/content/frontmatter';
 import { getSkillGrants, setSkillGrant, permissionsMatch } from '@/lib/ai-config/skill-grants';
 import { validateSkillName } from '@/lib/ai-config/skill-validator';
 import { t } from '@/lib/i18n';
-import type { ToolGate, PermissionRequestDetails } from '@/lib/tool-permissions';
+import type { ToolGate, PermissionRequestDetails } from '@/lib/agent/tool-permissions';
 import { runInSandbox } from './sandbox-rpc';
 
 // ─── Tool definition ───

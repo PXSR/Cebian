@@ -12,9 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
-import { isCustomProvider } from "@/lib/custom-models";
+import { isCustomProvider } from "@/lib/providers/custom-models";
 import { t } from "@/lib/i18n";
-import type { ApiKeyCredential } from "@/lib/storage";
+import type { ApiKeyCredential } from "@/lib/persistence/storage";
 
 interface ProviderApiKeyItemProps {
   provider: string;

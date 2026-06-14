@@ -1,7 +1,7 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useStorageItem } from '@/hooks/useStorageItem';
-import { maxRounds as maxRoundsStorage } from '@/lib/storage';
+import { maxRounds as maxRoundsStorage } from '@/lib/persistence/storage';
 import { t } from '@/lib/i18n';
 
 /**

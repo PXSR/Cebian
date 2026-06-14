@@ -6,10 +6,10 @@
 // without coupling to the agent hook's internals.
 //
 // Per-instance identity (used for ownership gating) lives in
-// `lib/instance-id.ts` — it's a global app-wide concern, not specific
+// `lib/ipc/instance-id.ts` — it's a global app-wide concern, not specific
 // to the recorder. Import `myInstanceId` from there if you need it.
 
-import type { ClientMessage } from '@/lib/protocol';
+import type { ClientMessage } from '@/lib/ipc/protocol';
 import type { RecordedSession } from './types';
 
 export interface RecorderStatus {

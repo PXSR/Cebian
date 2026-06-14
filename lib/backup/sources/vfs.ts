@@ -9,7 +9,7 @@
 // 这层 `vfs/` 前缀是 VFS 在 payload 内的命名空间；archive 打包时还会再套一层
 // `payload/`。
 
-import { vfs, normalizePath, isProtectedVfsRoot } from '@/lib/vfs';
+import { vfs, normalizePath, isProtectedVfsRoot } from '@/lib/persistence/vfs';
 import {
   vfsPathToKey,
   vfsKeyToPath,

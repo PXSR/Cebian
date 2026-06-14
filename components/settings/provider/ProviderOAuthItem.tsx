@@ -3,9 +3,9 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
-import { copyText } from '@/lib/clipboard';
+import { copyText } from '@/lib/ui/clipboard';
 import { t } from '@/lib/i18n';
-import type { OAuthCredential } from '@/lib/storage';
+import type { OAuthCredential } from '@/lib/persistence/storage';
 
 export type OAuthPhase =
   | { phase: 'idle' }

@@ -10,7 +10,7 @@ import type {
   JsonSchemaValidatorResult,
 } from '@modelcontextprotocol/sdk/validation/types.js';
 import { Value } from 'typebox/value';
-import type { MCPServerConfig } from '@/lib/storage';
+import type { MCPServerConfig } from '@/lib/persistence/storage';
 
 /**
  * Subset of `_meta.ui` we read on `Tool`s (per MCP Apps SEP-1865).

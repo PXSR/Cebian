@@ -1,6 +1,6 @@
 import type { ImageContent } from '@earendil-works/pi-ai';
-import { escapeXml } from './utils';
-import { RECORDING_SCHEMA_COMMENT } from './recorder/schema-doc';
+import { escapeXml } from '@/lib/utils';
+import { RECORDING_SCHEMA_COMMENT } from '@/lib/recorder/schema-doc';
 
 // ─── Attachment types ───
 

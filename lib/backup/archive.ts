@@ -14,7 +14,7 @@
 // manifest.json 始终明文、独占根目录，恢复前可读。
 
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
-import { isJunkPath, isSafeRelPath } from '@/lib/vfs';
+import { isJunkPath, isSafeRelPath } from '@/lib/persistence/vfs';
 import { encryptPayload, decryptPayload } from './crypto';
 import type { BackupManifest } from './types';
 

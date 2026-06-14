@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 
-import type { ThinkingLevel } from '@/lib/storage';
+import type { ThinkingLevel } from '@/lib/persistence/storage';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';

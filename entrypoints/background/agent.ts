@@ -1,9 +1,9 @@
 import { Agent, type AgentOptions, type AgentMessage, type AgentTool } from '@earendil-works/pi-agent-core';
 import type { Api, Model, Message } from '@earendil-works/pi-ai';
-import { providerCredentials, type OAuthCredential } from '@/lib/storage';
-import { getValidOAuthToken } from '@/lib/oauth';
-import { DEFAULT_SYSTEM_PROMPT } from '@/lib/constants';
-import { isCompactionSummary } from '@/lib/compaction';
+import { providerCredentials, type OAuthCredential } from '@/lib/persistence/storage';
+import { getValidOAuthToken } from '@/lib/providers/oauth';
+import { DEFAULT_SYSTEM_PROMPT } from '@/lib/agent/system-prompt';
+import { isCompactionSummary } from '@/lib/agent/compaction';
 
 // ─── Provider credential resolution ───
 
@@ -68,7 +68,7 @@ export interface CreateAgentOptions {
    * Optional pre-execution gate. pi-agent-core calls it after a tool's args
    * are validated and before `execute()`; returning `{ block: true, reason }`
    * blocks the call and emits an error tool result. Used to require user
-   * authorization before certain tools run (see `lib/tool-permissions.ts`).
+   * authorization before certain tools run (see `lib/agent/tool-permissions.ts`).
    */
   beforeToolCall?: AgentOptions['beforeToolCall'];
 }

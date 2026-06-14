@@ -6,7 +6,7 @@
  */
 
 import { t } from '@/lib/i18n';
-import { readText } from '@/lib/clipboard';
+import { readText } from '@/lib/ui/clipboard';
 
 /** Built-in template variable names. `getLabel` is called at use time so the
  * label tracks the active locale. */

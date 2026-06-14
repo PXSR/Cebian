@@ -9,7 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { onConfirmChange, type ConfirmState } from '@/lib/dialog';
+import { onConfirmChange, type ConfirmState } from '@/lib/ui/dialog';
 import { t } from '@/lib/i18n';
 
 /**

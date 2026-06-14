@@ -1,4 +1,4 @@
-import { vfs } from '@/lib/vfs';
+import { vfs } from '@/lib/persistence/vfs';
 import picomatch from 'picomatch';
 
 /** Maximum file content size (bytes) returned by fs_read_file before truncation. */

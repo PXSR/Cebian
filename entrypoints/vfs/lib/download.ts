@@ -1,5 +1,5 @@
 import { zip } from 'fflate';
-import { vfs } from '@/lib/vfs';
+import { vfs } from '@/lib/persistence/vfs';
 
 /** 递归遍历 VFS 中的 `rootPath`，把每个常规文件打进一个 zip 归档。归档内的
  *  路径相对 `rootPath` 扁平保留——下载 `/prompts` 得到的 `prompts.zip` 根条目

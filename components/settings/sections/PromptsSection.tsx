@@ -1,9 +1,9 @@
 import { useCallback } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { FileWorkspace } from './FileWorkspace';
-import { encodeRelPath } from '@/lib/vfs';
-import { CEBIAN_PROMPTS_DIR } from '@/lib/constants';
-import { settingsFilePanelWidth } from '@/lib/storage';
+import { encodeRelPath } from '@/lib/persistence/vfs';
+import { CEBIAN_PROMPTS_DIR } from '@/lib/persistence/vfs-paths';
+import { settingsFilePanelWidth } from '@/lib/persistence/storage';
 import type { SettingsOutletContext } from '@/components/settings/SettingsLayout';
 import { t } from '@/lib/i18n';
 

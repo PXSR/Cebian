@@ -5,7 +5,7 @@
 //      `RecorderRuntimeMessage` shapes below. The background filters by
 //      `kind === 'cebian_recorder'` to ignore unrelated runtime messages.
 //   2. Sidepanel ↔ background: piggybacks on the existing AGENT_PORT_NAME
-//      via the new variants added to `lib/protocol.ts`.
+//      via the new variants added to `lib/ipc/protocol.ts`.
 
 import type { RecordedEventWithoutBase } from './types';
 

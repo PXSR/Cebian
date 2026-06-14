@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PROTECTED_VFS_ROOTS, isProtectedVfsRoot } from '@/lib/vfs';
+import { PROTECTED_VFS_ROOTS, isProtectedVfsRoot } from '@/lib/persistence/vfs';
 
 // 受保护根是 VFS 层的结构不变量：恢复 / 清空必须保证它们恒为目录。这里只覆盖纯谓词，
 // 不碰 IndexedDB。

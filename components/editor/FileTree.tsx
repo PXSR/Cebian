@@ -12,7 +12,7 @@ import { ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, File
 import {
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
 } from '@/components/ui/context-menu';
-import { vfs } from '@/lib/vfs';
+import { vfs } from '@/lib/persistence/vfs';
 import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 

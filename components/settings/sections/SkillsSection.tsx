@@ -6,9 +6,9 @@ import {
   FileWorkspace,
   type FileWorkspaceAction, type FileWorkspaceHandle,
 } from './FileWorkspace';
-import { encodeRelPath } from '@/lib/vfs';
-import { CEBIAN_SKILLS_DIR } from '@/lib/constants';
-import { settingsFilePanelWidth } from '@/lib/storage';
+import { encodeRelPath } from '@/lib/persistence/vfs';
+import { CEBIAN_SKILLS_DIR } from '@/lib/persistence/vfs-paths';
+import { settingsFilePanelWidth } from '@/lib/persistence/storage';
 import { createSkillTemplate } from '@/lib/ai-config/skill-creator';
 import {
   exportSkillPackage,
@@ -17,8 +17,8 @@ import {
   SkillPackageError,
   type SkillImportResult,
 } from '@/lib/ai-config/skill-transfer';
-import { showDialog } from '@/lib/dialog';
-import { vfs, normalizePath } from '@/lib/vfs';
+import { showDialog } from '@/lib/ui/dialog';
+import { vfs, normalizePath } from '@/lib/persistence/vfs';
 import { downloadFile } from '@/lib/utils';
 import type { SettingsOutletContext } from '@/components/settings/SettingsLayout';
 import { t } from '@/lib/i18n';

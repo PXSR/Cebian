@@ -14,7 +14,7 @@ import {
   type BackupResponse,
   type ApplySessionsResult,
 } from '@/lib/backup/sources/sessions';
-import { toSessionRecord, isValidSessionLike, type SessionRecord, type SessionRecordLike } from '@/lib/db';
+import { toSessionRecord, isValidSessionLike, type SessionRecord, type SessionRecordLike } from '@/lib/persistence/db';
 
 /** 统一把异步结果包成响应信封发回，错误转成可读字符串（页面侧据此重新抛出）。 */
 function respond<T>(

@@ -8,7 +8,7 @@ import type {
   ImageContent,
 } from '@earendil-works/pi-ai';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
-import { unescapeXml } from './utils';
+import { unescapeXml } from '@/lib/utils';
 
 // ─── Parsed attachment metadata for UI display ───
 

@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useUpdateCheck, getInstallGuideUrl } from '@/hooks/useUpdateCheck';
-import { updateNoticeState } from '@/lib/storage';
+import { updateNoticeState } from '@/lib/persistence/storage';
 import { t } from '@/lib/i18n';
 
 /** 弹窗层节流：关闭/立即更新后 24h 内不再自动弹出。 */

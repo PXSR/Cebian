@@ -1,8 +1,8 @@
 import { Type, type Static } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { TOOL_FS_SAVE_URL } from '@/lib/tools/names';
-import { vfs } from '@/lib/vfs';
-import { extensionForMime, isTextualMime } from '@/lib/mime';
+import { vfs } from '@/lib/persistence/vfs';
+import { extensionForMime, isTextualMime } from '@/lib/content/mime';
 import { formatSize } from './fs-helpers';
 
 /** Default ceiling on response body bytes if the caller doesn't override

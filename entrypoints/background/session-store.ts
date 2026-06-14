@@ -9,7 +9,7 @@ import {
   applySessionsTransactional,
   ThrottledSessionWriter,
   type SessionRecord,
-} from '@/lib/db';
+} from '@/lib/persistence/db';
 import { planSessionWrites } from '@/lib/backup/sources/sessions';
 import type { RestoreStrategy } from '@/lib/backup/types';
 import type { ApplySessionsResult } from '@/lib/backup/sources/sessions';

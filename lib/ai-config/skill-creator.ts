@@ -4,7 +4,7 @@
  * Creates a new skill directory with a SKILL.md template, plus empty `scripts/`
  * and `references/` subdirs. Naming collides are resolved by appending `-N`.
  */
-import { vfs } from '@/lib/vfs';
+import { vfs } from '@/lib/persistence/vfs';
 import { t } from '@/lib/i18n';
 
 async function uniqueName(dir: string, base: string): Promise<string> {

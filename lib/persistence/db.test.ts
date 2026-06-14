@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toSessionRecord, isValidSessionLike, type SessionRecordLike } from '@/lib/db';
+import { toSessionRecord, isValidSessionLike, type SessionRecordLike } from '@/lib/persistence/db';
 
 const base: SessionRecordLike = {
   id: '6f9619ff-8b86-d011-b42d-00cf4fc964ff',

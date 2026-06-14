@@ -3,7 +3,7 @@ import { Code, Eye } from 'lucide-react';
 import { CopyButton } from '@/components/common/CopyButton';
 import { MarkdownRenderer } from '@/components/common/MarkdownRenderer';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { parseFrontmatter } from '@/lib/frontmatter';
+import { parseFrontmatter } from '@/lib/content/frontmatter';
 import { t } from '@/lib/i18n';
 import { fileExtension, formatSize, pickFileIcon } from '../lib/path-utils';
 import type { FileMedia } from '../types';

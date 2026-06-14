@@ -135,7 +135,7 @@ export function waitForNavigation(tabId: number, timeout: number): Promise<strin
 
 // ─── Page injectability ───
 
-import { RESTRICTED_URL_PREFIXES } from './recorder/constants';
+import { RESTRICTED_URL_PREFIXES } from '@/lib/recorder/constants';
 
 /**
  * Whether a content script can be programmatically injected into a page.

@@ -9,11 +9,11 @@
 //
 // 走 chrome.runtime.sendMessage（非 agent port，那是另一条专用通道）。会话记录是
 // JSON-safe（无 Uint8Array 等需信封的二进制）。但消息内容里可能含 base64 内联图片
-// （见 lib/attachments），完整历史经一次 sendMessage 序列化可能很大。
+// （见 lib/agent/attachments），完整历史经一次 sendMessage 序列化可能很大。
 // TODO（未来）：无界大历史应改为分块 / 分页协议，或由 background 落一份临时
 // payload 供页面分块拉取，避免单条 runtime message 过大导致发送失败或内存压力。
 
-import type { SessionRecord } from '@/lib/db';
+import type { SessionRecord } from '@/lib/persistence/db';
 import type { RestoreStrategy } from '../types';
 
 // ─── IPC 契约 ───

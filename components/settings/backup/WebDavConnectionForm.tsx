@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { testConnection, webdavErrorMessage, assertValidBaseUrl } from '@/lib/backup/webdav';
-import type { WebDavConfig } from '@/lib/storage';
+import type { WebDavConfig } from '@/lib/persistence/storage';
 import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 

@@ -1,5 +1,5 @@
 import type { Api, Model } from '@earendil-works/pi-ai';
-import type { CustomProviderConfig, CustomModelDef } from './storage';
+import type { CustomProviderConfig, CustomModelDef } from '@/lib/persistence/storage';
 import { t } from '@/lib/i18n';
 
 /** Prefix used to distinguish custom providers from built-in ones */

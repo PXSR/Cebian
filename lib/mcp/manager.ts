@@ -1,4 +1,4 @@
-﻿import { mcpServers, type MCPServerConfig } from '@/lib/storage';
+import { mcpServers, type MCPServerConfig } from '@/lib/persistence/storage';
 import {
   MCPClient,
   type MCPResourceContents,

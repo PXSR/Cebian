@@ -9,7 +9,7 @@ import {
   type PermissionRequest,
   type PermissionRequestDetails,
   type RequestDecisionFn,
-} from '@/lib/tool-permissions';
+} from '@/lib/agent/tool-permissions';
 import { CHROME_API_WHITELIST } from '@/lib/tools/chrome-api-whitelist';
 import type { BeforeToolCallContext } from '@earendil-works/pi-agent-core';
 

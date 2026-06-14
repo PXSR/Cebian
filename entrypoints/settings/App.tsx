@@ -4,7 +4,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { ConfirmOutlet } from '@/components/dialogs/confirm-outlet';
 import { SettingsRoutes } from '@/entrypoints/sidepanel/pages/settings';
 import { useStorageItem } from '@/hooks/useStorageItem';
-import { themePreference } from '@/lib/storage';
+import { themePreference } from '@/lib/persistence/storage';
 
 function resolveTheme(pref: 'dark' | 'light' | 'system'): 'dark' | 'light' {
   if (pref !== 'system') return pref;

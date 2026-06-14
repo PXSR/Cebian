@@ -4,8 +4,8 @@
 // 根目录」「各分类数据写进 payload 里的哪个文件」都在此声明，避免两端各写一份漂移。
 // VFS 源（sources/vfs.ts）只认路径前缀、不认分类，分类知识收敛在这里。
 
-import { normalizePath } from '@/lib/vfs';
-import { CEBIAN_SKILLS_DIR, CEBIAN_PROMPTS_DIR, WORKSPACES_ROOT } from '@/lib/constants';
+import { normalizePath } from '@/lib/persistence/vfs';
+import { CEBIAN_SKILLS_DIR, CEBIAN_PROMPTS_DIR, WORKSPACES_ROOT } from '@/lib/persistence/vfs-paths';
 import { isValidSessionId } from '@/lib/utils';
 
 /** payload 内各分类数据的文件名（裸路径，archive 会再套 `payload/` 前缀）。 */

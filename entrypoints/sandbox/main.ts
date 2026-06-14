@@ -4,7 +4,7 @@
  * Chrome API calls are proxied back to the background via postMessage → offscreen → background.
  */
 
-import { encodeBinary, encodeBinaryArgs, decodeBinary } from '@/lib/sandbox-binary';
+import { encodeBinary, encodeBinaryArgs, decodeBinary } from '@/lib/ipc/sandbox-binary';
 
 // ─── Message types (shared with sandbox-rpc.ts) ───
 

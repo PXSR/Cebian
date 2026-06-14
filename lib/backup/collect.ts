@@ -15,7 +15,7 @@ import {
   vfsKeyToPath,
   isUnderAnyRoot,
 } from './payload-format';
-import { WORKSPACES_ROOT } from '@/lib/constants';
+import { WORKSPACES_ROOT } from '@/lib/persistence/vfs-paths';
 import {
   BACKUP_FORMAT_VERSION,
   type BackupOptions,

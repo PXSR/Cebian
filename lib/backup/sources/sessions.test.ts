@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { planSessionWrites, type ExistingSessionMeta } from '@/lib/backup/sources/sessions';
-import type { SessionRecord } from '@/lib/db';
+import type { SessionRecord } from '@/lib/persistence/db';
 
 function rec(id: string, updatedAt: number): SessionRecord {
   return {

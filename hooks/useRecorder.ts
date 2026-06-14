@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { recorderChannel, type RecorderStatus } from '@/lib/recorder/sidepanel-channel';
-import { myInstanceId } from '@/lib/instance-id';
+import { myInstanceId } from '@/lib/ipc/instance-id';
 import { t } from '@/lib/i18n';
 
 export interface UseRecorderResult {

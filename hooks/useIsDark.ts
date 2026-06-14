@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStorageItem } from './useStorageItem';
-import { themePreference } from '@/lib/storage';
+import { themePreference } from '@/lib/persistence/storage';
 
 /**
  * Reactive hook that returns whether the current theme is dark.

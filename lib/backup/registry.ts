@@ -24,7 +24,7 @@ import {
   type ProviderCredentials,
   type WebDavConfig,
   type CustomProviderConfig,
-} from '@/lib/storage';
+} from '@/lib/persistence/storage';
 
 /**
  * 一个 storage item 在备份中的归属：

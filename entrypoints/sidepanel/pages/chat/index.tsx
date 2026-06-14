@@ -29,17 +29,17 @@ import {
   getToolCalls,
   findToolResult,
   extractUserText,
-} from '@/lib/message-helpers';
+} from '@/lib/agent/message-helpers';
 import { getToolLabel } from '@/lib/tools/labels';
 import { uiToolRegistry } from '@/lib/tools/ui-registry';
-import { isCompactionSummary } from '@/lib/compaction';
-import { isPermissionRequest } from '@/lib/tool-permissions';
+import { isCompactionSummary } from '@/lib/agent/compaction';
+import { isPermissionRequest } from '@/lib/agent/tool-permissions';
 import { useBackgroundAgent } from '@/hooks/useBackgroundAgent';
 import { useStickToBottom } from '@/hooks/useStickToBottom';
 import { useStorageItem } from '@/hooks/useStorageItem';
-import { activeModel } from '@/lib/storage';
-import type { Attachment } from '@/lib/attachments';
-import type { SessionRecord } from '@/lib/db';
+import { activeModel } from '@/lib/persistence/storage';
+import type { Attachment } from '@/lib/agent/attachments';
+import type { SessionRecord } from '@/lib/persistence/db';
 import { t } from '@/lib/i18n';
 
 // ─── ChatPage ───

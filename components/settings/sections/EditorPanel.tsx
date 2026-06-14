@@ -10,7 +10,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { CodeMirrorEditor } from '@/components/editor/CodeMirrorEditor';
-import { vfs } from '@/lib/vfs';
+import { vfs } from '@/lib/persistence/vfs';
 import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 

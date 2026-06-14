@@ -1,11 +1,11 @@
 import { Type } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { TOOL_READ_PAGE } from '@/lib/tools/names';
-import { executeInTabWithArgs } from '@/lib/tab-helpers';
+import { executeInTabWithArgs } from '@/lib/browser/tab-actions';
 import { ensureOffscreen } from './offscreen';
 import { isLikelyPdfUrl, pdfRedirectHint } from './pdf';
 import type { OffscreenRequest, OffscreenResponse } from '@/entrypoints/offscreen/main';
-import { vfs } from '@/lib/vfs';
+import { vfs } from '@/lib/persistence/vfs';
 
 const ReadPageParameters = Type.Object({
   mode: Type.Union(

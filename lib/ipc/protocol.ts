@@ -1,11 +1,11 @@
 // Port communication protocol: Client (sidepanel) ↔ Server (background)
 
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
-import type { SessionRecord } from './db';
-import type { Attachment } from './attachments';
-import type { RecordedSession } from './recorder/types';
-import type { MCPResourceContents } from './mcp/client';
-import type { PermissionRequest } from './tool-permissions';
+import type { SessionRecord } from '@/lib/persistence/db';
+import type { Attachment } from '@/lib/agent/attachments';
+import type { RecordedSession } from '@/lib/recorder/types';
+import type { MCPResourceContents } from '@/lib/mcp/client';
+import type { PermissionRequest } from '@/lib/agent/tool-permissions';
 
 // ─── Port name ───
 

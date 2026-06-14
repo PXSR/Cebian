@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { t } from '@/lib/i18n';
-import { getActiveTabId } from '@/lib/tab-helpers';
-import { attachEmulation, detachEmulation } from '@/lib/mobile-emulation';
+import { getActiveTabId } from '@/lib/browser/tab-actions';
+import { attachEmulation, detachEmulation } from '@/lib/browser/mobile-emulation';
 
 export function useMobileEmulation() {
   const mobileTabsRef = useRef(new Set<number>());

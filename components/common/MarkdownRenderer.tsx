@@ -3,12 +3,12 @@ import Markdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import type { Components } from 'react-markdown';
-import { showDialog } from '@/lib/dialog';
+import { showDialog } from '@/lib/ui/dialog';
 import { CopyButton } from './CopyButton';
 import { t } from '@/lib/i18n';
-import { CEBIAN_SKILLS_DIR, CEBIAN_PROMPTS_DIR } from '@/lib/constants';
-import { encodeRelPath, vfs } from '@/lib/vfs';
-import { isImageMime, mimeFromPath } from '@/lib/mime';
+import { CEBIAN_SKILLS_DIR, CEBIAN_PROMPTS_DIR } from '@/lib/persistence/vfs-paths';
+import { encodeRelPath, vfs } from '@/lib/persistence/vfs';
+import { isImageMime, mimeFromPath } from '@/lib/content/mime';
 
 /**
  * Minimal structural types for the hast (HTML AST) nodes react-markdown passes

@@ -22,7 +22,7 @@
 //     `server_unavailable` → "tool is offline" empty state,
 //     `fetch_failed` → retry button.
 
-import type { ClientMessage, ServerMessage } from '@/lib/protocol';
+import type { ClientMessage, ServerMessage } from '@/lib/ipc/protocol';
 import type { MCPResourceContents } from './client';
 
 /** Error codes the BG can return on `mcp_resource_result`. */

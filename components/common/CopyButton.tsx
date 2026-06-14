@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { copyText } from '@/lib/clipboard';
+import { copyText } from '@/lib/ui/clipboard';
 import { t } from '@/lib/i18n';
 
 /**

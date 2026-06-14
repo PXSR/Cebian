@@ -3,7 +3,7 @@ import { AlertTriangle, FileCode, ShieldAlert } from 'lucide-react';
 import { DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { closeDialog, showConfirm } from '@/lib/dialog';
+import { closeDialog, showConfirm } from '@/lib/ui/dialog';
 import { t } from '@/lib/i18n';
 import {
   importSkillPackage,

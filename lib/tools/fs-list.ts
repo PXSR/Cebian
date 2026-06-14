@@ -1,7 +1,7 @@
 import { Type } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { TOOL_FS_LIST } from '@/lib/tools/names';
-import { vfs } from '@/lib/vfs';
+import { vfs } from '@/lib/persistence/vfs';
 import { formatSize } from './fs-helpers';
 
 const FsListParameters = Type.Object({

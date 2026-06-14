@@ -7,8 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import type { CustomProviderConfig, CustomModelDef } from '@/lib/storage';
-import { fetchRemoteModels } from '@/lib/custom-models';
+import type { CustomProviderConfig, CustomModelDef } from '@/lib/persistence/storage';
+import { fetchRemoteModels } from '@/lib/providers/custom-models';
 import { t } from '@/lib/i18n';
 
 // ─── Shared form body (used by both create and edit) ───

@@ -1,5 +1,5 @@
-import type { ElementAttachment } from './attachments';
-import { getActiveTabId } from '@/lib/tab-helpers';
+import type { ElementAttachment } from '@/lib/agent/attachments';
+import { getActiveTabId } from '@/lib/browser/tab-actions';
 import { t } from '@/lib/i18n';
 
 // ─── Injected picker script (self-contained, runs in content-script isolated world) ───

@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { getModels, type KnownProvider, type Api, type Model } from '@earendil-works/pi-ai';
 import { Check, ChevronDown, Settings } from 'lucide-react';
 
-import type { ActiveModel, ProviderCredentials, CustomProviderConfig } from '@/lib/storage';
-import { isCustomProvider, findCustomProvider, getCustomModels, customProviderKey } from '@/lib/custom-models';
+import type { ActiveModel, ProviderCredentials, CustomProviderConfig } from '@/lib/persistence/storage';
+import { isCustomProvider, findCustomProvider, getCustomModels, customProviderKey } from '@/lib/providers/custom-models';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {

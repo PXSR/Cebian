@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
-import { asString, isValidSessionId } from './utils';
+import { asString, isValidSessionId } from '@/lib/utils';
 
 // ─── Schema ───
 

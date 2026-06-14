@@ -28,11 +28,11 @@ import {
   createCompactionSummaryMessage,
   isCompactionSummary,
   type CompactionSummaryMessage,
-} from '@/lib/compaction';
+} from '@/lib/agent/compaction';
 import { scanSkillIndex, buildSkillsBlock } from '@/lib/ai-config/scanner';
 import { sessionStore } from './session-store';
-import { gatherPageContext } from '@/lib/page-context';
-import { buildTextPrefix, extractImages, type Attachment } from '@/lib/attachments';
+import { gatherPageContext } from '@/lib/agent/page-context';
+import { buildTextPrefix, extractImages, type Attachment } from '@/lib/agent/attachments';
 import { createSessionTools, buildSessionToolArray } from '@/lib/tools';
 import { runSkillGate } from '@/lib/tools/run-skill';
 import type { SessionToolContext } from '@/lib/tools/session-context';
@@ -48,20 +48,20 @@ import {
   type PermissionRequest,
   type PermissionDecision,
   type ToolGate,
-} from '@/lib/tool-permissions';
-import type { ServerMessage } from '@/lib/protocol';
-import type { SessionRecord } from '@/lib/db';
-import { truncateForRetry } from '@/lib/message-helpers';
+} from '@/lib/agent/tool-permissions';
+import type { ServerMessage } from '@/lib/ipc/protocol';
+import type { SessionRecord } from '@/lib/persistence/db';
+import { truncateForRetry } from '@/lib/agent/message-helpers';
 import {
   providerCredentials,
   customProviders as customProvidersStorage,
   activeModel as activeModelStorage,
   thinkingLevel as thinkingLevelStorage,
   userInstructions as userInstructionsStorage,
-} from '@/lib/storage';
+} from '@/lib/persistence/storage';
 import { getMCPManager } from '@/lib/mcp/manager';
-import { getCopilotBaseUrl } from '@/lib/oauth';
-import { isCustomProvider, findCustomModel } from '@/lib/custom-models';
+import { getCopilotBaseUrl } from '@/lib/providers/oauth';
+import { isCustomProvider, findCustomModel } from '@/lib/providers/custom-models';
 import { t } from '@/lib/i18n';
 import { acquireKeepAlive, releaseKeepAlive } from './sw-keepalive';
 

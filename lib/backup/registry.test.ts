@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import * as storageModule from '@/lib/storage';
-import type { MCPServerConfig } from '@/lib/storage';
+import * as storageModule from '@/lib/persistence/storage';
+import type { MCPServerConfig } from '@/lib/persistence/storage';
 import {
   BACKUP_REGISTRY,
   registeredStorageKeys,

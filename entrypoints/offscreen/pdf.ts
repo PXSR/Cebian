@@ -9,7 +9,7 @@
 // DOMMatrix / OffscreenCanvas 等）；从 Service Worker 调 `loadPdfJs()` 会失败。
 
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { loadPdfJs } from '@/lib/pdf-loader';
+import { loadPdfJs } from '@/lib/content/pdf-loader';
 import { escapeRegExp } from '@/lib/utils';
 
 /** Structural slice of pdf.js's `TextItem` covering only the fields we

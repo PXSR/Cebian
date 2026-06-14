@@ -8,13 +8,13 @@ import { restoreStorage, type StorageRestoreResult } from './sources/storage';
 import { restoreSessions, type ApplySessionsResult } from './sources/sessions';
 import { restoreVfs, type VfsRestoreResult } from './sources/vfs';
 import { PAYLOAD_FILES, sessionIdFromFileKey, SKILLS_PROMPTS_ROOTS } from './payload-format';
-import { WORKSPACES_ROOT } from '@/lib/constants';
+import { WORKSPACES_ROOT } from '@/lib/persistence/vfs-paths';
 import {
   BACKUP_FORMAT_VERSION,
   type BackupManifest,
   type RestorePlan,
 } from './types';
-import { isValidSessionLike, type SessionRecord as DbSessionRecord } from '@/lib/db';
+import { isValidSessionLike, type SessionRecord as DbSessionRecord } from '@/lib/persistence/db';
 
 const decoder = new TextDecoder();
 

@@ -1,8 +1,8 @@
 import { Type } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { TOOL_EXECUTE_JS } from '@/lib/tools/names';
-import { executeViaDebugger } from '@/lib/tab-helpers';
-import { vfs } from '@/lib/vfs';
+import { executeViaDebugger } from '@/lib/browser/tab-actions';
+import { vfs } from '@/lib/persistence/vfs';
 
 /** Sentinel value returned by the injected func when CSP blocks new Function(). */
 const CSP_BLOCKED = '__cebian_csp_blocked__';

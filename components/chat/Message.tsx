@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MarkdownRenderer } from '@/components/common/MarkdownRenderer';
 import { MessageMetaRow, type MessageMetaProps } from '@/components/chat/MessageMetaRow';
-import { extractUserText, extractUserAttachments } from '@/lib/message-helpers';
-import { showDialog } from '@/lib/dialog';
-import { RECORDING_MIME } from '@/lib/attachments';
+import { extractUserText, extractUserAttachments } from '@/lib/agent/message-helpers';
+import { showDialog } from '@/lib/ui/dialog';
+import { RECORDING_MIME } from '@/lib/agent/attachments';
 import { t } from '@/lib/i18n';
-import { describePermission } from '@/lib/tool-permissions';
+import { describePermission } from '@/lib/agent/tool-permissions';
 import { downloadFile, formatDuration, formatCharCount } from '@/lib/utils';
 import type { Message } from '@earendil-works/pi-ai';
 

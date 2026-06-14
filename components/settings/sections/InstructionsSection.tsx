@@ -1,7 +1,7 @@
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useStorageItem } from '@/hooks/useStorageItem';
-import { userInstructions as userInstructionsStorage } from '@/lib/storage';
+import { userInstructions as userInstructionsStorage } from '@/lib/persistence/storage';
 import { t } from '@/lib/i18n';
 
 /**

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { onDialogChange, type DialogState } from '@/lib/dialog';
+import { onDialogChange, type DialogState } from '@/lib/ui/dialog';
 import { dialogRenderers } from '.';
 
 export function DialogOutlet() {

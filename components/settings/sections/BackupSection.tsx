@@ -17,9 +17,9 @@ import {
   webdavErrorMessage,
 } from '@/lib/backup/webdav';
 import { useStorageItem } from '@/hooks/useStorageItem';
-import { webdavConfig, type WebDavConfig } from '@/lib/storage';
+import { webdavConfig, type WebDavConfig } from '@/lib/persistence/storage';
 import { downloadFile } from '@/lib/utils';
-import { showConfirm } from '@/lib/dialog';
+import { showConfirm } from '@/lib/ui/dialog';
 import { t } from '@/lib/i18n';
 import type {
   BackupCategory,

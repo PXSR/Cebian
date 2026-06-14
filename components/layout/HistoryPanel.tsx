@@ -8,8 +8,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage, type SessionMeta } from '@/lib/protocol';
-import { showConfirm } from '@/lib/dialog';
+import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage, type SessionMeta } from '@/lib/ipc/protocol';
+import { showConfirm } from '@/lib/ui/dialog';
 import { t } from '@/lib/i18n';
 
 interface HistoryPanelProps {

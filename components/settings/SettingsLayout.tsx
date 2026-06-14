@@ -4,7 +4,7 @@ import { ArrowLeft, ExternalLink } from 'lucide-react';
 import { browser } from 'wxt/browser';
 import { Button } from '@/components/ui/button';
 import { SectionNav } from './SectionNav';
-import { lastSettingsSection } from '@/lib/storage';
+import { lastSettingsSection } from '@/lib/persistence/storage';
 import { useContainerWidth } from '@/hooks/useContainerWidth';
 import { t } from '@/lib/i18n';
 

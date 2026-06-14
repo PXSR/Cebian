@@ -3,7 +3,7 @@ import {
   type MCPServerConfig,
   type MCPTransportConfig,
   type MCPAuthConfig,
-} from '@/lib/storage';
+} from '@/lib/persistence/storage';
 import { t } from '@/lib/i18n';
 
 /**

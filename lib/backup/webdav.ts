@@ -6,7 +6,7 @@
 // 由调用方（BackupSection）负责打包 / 解包。XML 解析用页面环境的 DOMParser；
 // background SW 没有 DOMParser，这也是整条编排放在页面跑的原因之一（见技术设计）。
 
-import type { WebDavConfig } from '@/lib/storage';
+import type { WebDavConfig } from '@/lib/persistence/storage';
 import { t } from '@/lib/i18n';
 
 /** 远程快照库里的一个快照（一个 .zip 文件）。 */

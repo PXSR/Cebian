@@ -10,7 +10,7 @@ import { MCPSection } from '@/components/settings/sections/MCPSection';
 import { BackupSection } from '@/components/settings/sections/BackupSection';
 import { AdvancedSection } from '@/components/settings/sections/AdvancedSection';
 import { AboutSection } from '@/components/settings/sections/AboutSection';
-import { lastSettingsSection } from '@/lib/storage';
+import { lastSettingsSection } from '@/lib/persistence/storage';
 
 interface SettingsRoutesProps {
   /** Absolute base path where SettingsRoutes is mounted (e.g. '/settings'). */

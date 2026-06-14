@@ -5,11 +5,11 @@
  */
 
 import { ensureOffscreen } from './offscreen';
-import { executeViaDebugger } from '@/lib/tab-helpers';
+import { executeViaDebugger } from '@/lib/browser/tab-actions';
 import { isChromeCallAllowed } from './chrome-api-whitelist';
-import { vfs } from '@/lib/vfs';
+import { vfs } from '@/lib/persistence/vfs';
 import { isVfsCallAllowed, resolveScopedPath, sessionSkillRoot } from './vfs-whitelist';
-import { decodeBinaryArgs, decodeBinary, encodeBinary } from '@/lib/sandbox-binary';
+import { decodeBinaryArgs, decodeBinary, encodeBinary } from '@/lib/ipc/sandbox-binary';
 import type { MatchPattern } from './url-pattern';
 import { parseBgFetchPatterns } from './url-pattern';
 import { handleBgFetch } from './bg-fetch';

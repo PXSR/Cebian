@@ -1,5 +1,5 @@
 import { useStorageItem } from '@/hooks/useStorageItem';
-import { mcpServers } from '@/lib/storage';
+import { mcpServers } from '@/lib/persistence/storage';
 import { MCPServerCard } from '@/components/settings/mcp/MCPServerCard';
 import { MCPServerAddForm } from '@/components/settings/mcp/MCPServerForm';
 import { t } from '@/lib/i18n';

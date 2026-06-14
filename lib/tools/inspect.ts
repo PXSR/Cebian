@@ -1,7 +1,7 @@
 import { Type } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { TOOL_INSPECT } from '@/lib/tools/names';
-import { executeInTabWithArgs } from '@/lib/tab-helpers';
+import { executeInTabWithArgs } from '@/lib/browser/tab-actions';
 
 // ─── Parameters ───
 

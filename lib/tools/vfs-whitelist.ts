@@ -14,7 +14,7 @@
  * - 跨 session 持久状态**不在 v1 范围**，需要时另起 `vfs.cache` 之类的权限。
  */
 
-import { normalizePath } from '@/lib/vfs';
+import { normalizePath } from '@/lib/persistence/vfs';
 import { isValidSessionId } from '@/lib/utils';
 
 // ─── Method groups (white-list) ───

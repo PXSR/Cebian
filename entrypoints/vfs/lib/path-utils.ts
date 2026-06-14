@@ -1,5 +1,5 @@
 import { File, FileCode, FileText, type LucideIcon } from 'lucide-react';
-import { normalizePath } from '@/lib/vfs';
+import { normalizePath } from '@/lib/persistence/vfs';
 
 /** Extensions that the loader treats as binary (no inline preview, no utf8
  *  read). Some media extensions (e.g. `png`, `mp4`) also appear here as a

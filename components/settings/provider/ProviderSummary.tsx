@@ -1,6 +1,6 @@
 import { getModels, type KnownProvider, type Api, type Model } from '@earendil-works/pi-ai';
-import type { ProviderCredential, CustomProviderConfig } from '@/lib/storage';
-import { isCustomProvider, findCustomProvider, getCustomModels } from '@/lib/custom-models';
+import type { ProviderCredential, CustomProviderConfig } from '@/lib/persistence/storage';
+import { isCustomProvider, findCustomProvider, getCustomModels } from '@/lib/providers/custom-models';
 import { t } from '@/lib/i18n';
 
 interface ProviderSummaryProps {

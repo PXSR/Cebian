@@ -4,12 +4,12 @@ import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import type { MCPServerConfig } from '@/lib/storage';
+import type { MCPServerConfig } from '@/lib/persistence/storage';
 import { setMCPServerEnabled, removeMCPServer } from '@/lib/mcp/store';
 import { MCPServerEditForm } from './MCPServerForm';
 import { useMCPStatus, type MCPStatusInfo } from '@/hooks/useMCPStatus';
 import { cn } from '@/lib/utils';
-import { showConfirm } from '@/lib/dialog';
+import { showConfirm } from '@/lib/ui/dialog';
 import { t } from '@/lib/i18n';
 
 interface MCPServerCardProps {

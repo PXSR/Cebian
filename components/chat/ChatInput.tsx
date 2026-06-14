@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback, type KeyboardEvent } from 'react';
 import { Send, Square, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, FileText, X, FileType, Film } from 'lucide-react';
-import { showDialog } from '@/lib/dialog';
+import { showDialog } from '@/lib/ui/dialog';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,21 +10,21 @@ import { ModelSelector } from '@/components/chat/ModelSelector';
 import { ThinkingLevelSelector } from '@/components/chat/ThinkingLevelSelector';
 import { RecordButton } from '@/components/chat/RecordButton';
 import { useStorageItem } from '@/hooks/useStorageItem';
-import { activeModel, thinkingLevel, providerCredentials, customProviders as customProvidersStorage, type ThinkingLevel } from '@/lib/storage';
+import { activeModel, thinkingLevel, providerCredentials, customProviders as customProvidersStorage, type ThinkingLevel } from '@/lib/persistence/storage';
 import { getModel } from '@earendil-works/pi-ai';
-import { isCustomProvider, findCustomModel } from '@/lib/custom-models';
-import { startElementPicker, cancelElementPicker } from '@/lib/element-picker';
+import { isCustomProvider, findCustomModel } from '@/lib/providers/custom-models';
+import { startElementPicker, cancelElementPicker } from '@/lib/browser/element-picker';
 import { scanPrompts, type PromptMeta } from '@/lib/ai-config/scanner';
 import { replaceTemplateVars, gatherTemplateVars } from '@/lib/ai-config/template';
-import { vfs } from '@/lib/vfs';
-import { parseFrontmatter } from '@/lib/frontmatter';
-import { CEBIAN_PROMPTS_DIR } from '@/lib/constants';
+import { vfs } from '@/lib/persistence/vfs';
+import { parseFrontmatter } from '@/lib/content/frontmatter';
+import { CEBIAN_PROMPTS_DIR } from '@/lib/persistence/vfs-paths';
 import {
   MAX_ATTACHMENT_COUNT, MAX_IMAGE_SIZE, MAX_TEXT_FILE_SIZE,
   RECORDING_MIME,
   isImageFile, isTextFile, formatFileSize,
   type Attachment,
-} from '@/lib/attachments';
+} from '@/lib/agent/attachments';
 import { recordingToAttachment } from '@/lib/recorder/to-attachment';
 import { recorderChannel } from '@/lib/recorder/sidepanel-channel';
 import { useRecorder } from '@/hooks/useRecorder';
