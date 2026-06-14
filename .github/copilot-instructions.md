@@ -55,6 +55,35 @@ Names carry the design. Get them right the first time — the user reviews names
 - **One concept, one type.** Don't split a single concept into near-duplicate types — collapse `VfsMultiRootGroup` + `VfsSingleRootGroup` into one `VfsRootGroup { roots: string[] }`. A "more complete looking" pair of shapes is usually one shape.
 - **Exports at the bottom.** Put the public API at the end of the file, with types and internal helpers above, so opening the file shows "what this module offers" first. Group exports by audience when a file serves more than one (e.g. a "source API" block and an "IPC wire contract" block).
 
+### `lib/` internal organization (where a new lib file goes)
+
+`lib/` is organized **by concept, not by execution context**. A concept that spans both background and UI (connected by IPC) stays *whole* in one folder — never split a concept into `background/` vs `ui/` folders. The execution context shows up in the **file name**, not the folder. Decide placement with this tree:
+
+1. **Used by exactly one entrypoint and not reusable?** → it belongs in that `entrypoints/<ctx>/`, **not** in `lib/`. `lib/` is only for code shared across contexts, or pure utilities.
+2. **Pure utility — no Cebian domain, no platform binding, importable from anywhere (bg/UI/content/sandbox)?** → `lib/` root (this is why only `utils.ts` and `i18n.ts` live at the root).
+3. **Belongs to an existing concept?** → put it in that concept folder; encode the execution context in the filename:
+   - bare name / `types.ts` / `client.ts` = shared across contexts
+   - `*-channel.ts` = UX-side IPC entry (only UI imports it)
+   - `manager.ts` = background-side orchestration (only background imports it)
+4. **A new concept?** → only create a folder once it has **≥2 cohesive files**. A single-file concept stays a single file (in the nearest concept folder or at root) until a second context-specific file appears, then it graduates to a folder. Don't pre-build a folder for a split that hasn't happened.
+5. **Domain content (system prompts, injected preamble text, a config table bound to one concept)** → travels with its concept, **never** into a generic `constants.ts` grab-bag. (There is intentionally no `lib/constants.ts`.)
+
+The current concept/capability folders and their boundaries:
+
+| Folder | Concept / capability | Import boundary |
+| --- | --- | --- |
+| `agent/` | conversation runtime (attachments, message parsing, compaction, page-context, tool-permissions, system-prompt) | — |
+| `providers/` | AI provider connectivity (oauth, custom-models, registry) | — |
+| `ipc/` | cross-context messaging (protocol, instance-id, sandbox-binary) | — |
+| `persistence/` | data-at-rest (db, vfs, storage, vfs-paths) | platform: IndexedDB / chrome.storage |
+| `browser/` | chrome / CDP / page injection (tab-actions, mobile-emulation, element-picker) | content scripts must NOT import |
+| `ui/` | needs `document` / React / toast (dialog, clipboard) | background must NOT import |
+| `content/` | file-format helpers (mime, frontmatter, pdf-loader) | pure |
+| `ai-config/` `backup/` `mcp/` `recorder/` `tools/` | established domains | — |
+| `shims/` | third-party patches (not our concept) | — |
+
+The **capability** folders (`persistence/` / `browser/` / `ui/` / `content/`) encode an import-direction rule in their name — a reviewer can spot a violation from the import path alone (e.g. `entrypoints/background/*` importing `@/lib/ui/*` is wrong).
+
 ## Code Comments
 
 - 注释优先使用中文，其次是英文。必要的术语（API 名称、库名、协议字段、错误码等）保持英文即可，不要强行翻译。
