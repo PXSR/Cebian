@@ -1,0 +1,62 @@
+name: Bug Report (问题反馈)
+description: Report something that's broken (反馈一个故障或异常)
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a report! Please fill in the fields below in **English or 中文**.
+        感谢你抽空反馈！请用**英文或中文**填写下面的内容。
+
+        Before you start, please:
+        开始之前，请先：
+        - Search [existing issues](https://github.com/maotoumao/Cebian/issues?q=is%3Aissue) to avoid duplicates. (搜索一下[已有 issue](https://github.com/maotoumao/Cebian/issues?q=is%3Aissue)，避免重复。)
+        - Read [CONTRIBUTING.md](https://github.com/maotoumao/Cebian/blob/master/CONTRIBUTING.md) / [贡献指南](https://github.com/maotoumao/Cebian/blob/master/CONTRIBUTING.zh-CN.md).
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened? (发生了什么？)
+      description: Describe the bug clearly. Include error messages if any. (清晰描述这个问题，如有报错信息请一并贴出。)
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce (复现步骤)
+      description: Minimal steps to trigger the bug. (触发该问题的最小步骤。)
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior (期望行为)
+      description: What did you expect to happen? (你期望发生的结果是什么？)
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment (环境信息)
+      description: Browser & version, Cebian version, OS. (浏览器及版本、Cebian 版本、操作系统。)
+      placeholder: |
+        - Browser (浏览器): Chrome 126 / Edge 126 / Firefox 127
+        - Cebian version (版本): 1.2.3
+        - OS (操作系统): Windows 11 / macOS 14 / Linux
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots / logs (截图 / 日志)
+      description: Screenshots, console output, or anything else that helps. (截图、控制台输出或其它有助于排查的信息。)
+    validations:
+      required: false

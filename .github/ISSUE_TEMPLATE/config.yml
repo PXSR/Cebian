@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation (使用文档)
+    url: https://cebian.catcat.work
+    about: Read the docs before opening an issue. (提问前先看看文档。)
+  - name: Questions & Discussion (提问与讨论)
+    url: https://github.com/maotoumao/Cebian/issues?q=is%3Aissue
+    about: Search existing issues for questions and discussion. (在已有 issue 中搜索问题与讨论。)

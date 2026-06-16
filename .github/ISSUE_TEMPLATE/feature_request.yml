@@ -1,0 +1,46 @@
+name: Feature Request (功能建议)
+description: Propose a new feature or improvement (提出一个新功能或改进)
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion! Please fill in the fields below in **English or 中文**.
+        感谢你的建议！请用**英文或中文**填写下面的内容。
+
+        Before you start, please:
+        开始之前，请先：
+        - Search [existing issues](https://github.com/maotoumao/Cebian/issues?q=is%3Aissue) to avoid duplicates. (搜索一下[已有 issue](https://github.com/maotoumao/Cebian/issues?q=is%3Aissue)，避免重复。)
+        - Read [CONTRIBUTING.md](https://github.com/maotoumao/Cebian/blob/master/CONTRIBUTING.md) / [贡献指南](https://github.com/maotoumao/Cebian/blob/master/CONTRIBUTING.zh-CN.md).
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What do you want? (你想要什么？)
+      description: Describe the feature or change clearly and concisely. (清晰、简洁地描述这个功能或改动。)
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why? (为什么？)
+      description: What problem does it solve, or what use case does it serve? (它解决了什么问题，或满足了什么使用场景？)
+    validations:
+      required: true
+
+  - type: textarea
+    id: how
+    attributes:
+      label: How? (怎么做？ — 可选)
+      description: A rough idea of the approach or UI, if you have one. (如果你有想法，可以简单描述实现思路或界面设计。)
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered (考虑过的替代方案 — 可选)
+      description: Other approaches or workarounds you have tried or thought about. (你尝试或想到过的其它方案、变通办法。)
+    validations:
+      required: false
