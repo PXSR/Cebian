@@ -29,6 +29,9 @@ Once a plan is approved, execution must follow this strict per-task gating cycle
 
 If a subtask reveals the plan is wrong, stop and trigger the Plan-First re-approval flow above instead of pushing forward.
 
+**Changelog gate** — 当整个任务（非每个子任务）含有用户可见变更时，在报告完成前须按「Changelog」章节的规则在 `CHANGELOG.md` 的 `## [Unreleased]` 追加条目。纯内部重构 / 测试 / 构建 / 依赖升级等终端用户感知不到的变更可不记。
+When the overall task (not each subtask) carries user-visible changes, append entries to `## [Unreleased]` in `CHANGELOG.md` per the Changelog section before reporting completion. Internal-only churn (refactor / test / build / dependency bumps users can't perceive) may be skipped.
+
 ## Architecture Validation
 
 Before writing any code, verify placement and structure:
@@ -118,6 +121,23 @@ Unit tests use **Vitest** with the **`WxtVitest`** plugin (`wxt/testing/vitest-p
 - **Mocking `#imports`** — vitest sees the resolved import paths, not `#imports`. To mock a WXT util, `vi.mock` its real path (look it up in `.wxt/types/imports-module.d.ts`), not `'#imports'`.
 - **Exhaustiveness / registry guards** — when a registry or discriminated union must stay in sync with another source of truth (e.g. every storage item must be classified), back it with a test that enumerates the source and asserts completeness, so an omission fails CI instead of silently slipping through.
 
+## Changelog
+
+项目根目录维护单一的 `CHANGELOG.md`，格式遵循 [Keep a Changelog](https://keepachangelog.com/) + 语义化版本，中英双语。
+The repo keeps one root `CHANGELOG.md` following Keep a Changelog + SemVer, bilingual (Chinese + English).
+
+**What to record / 记什么** — 只记终端用户能感知的变更：新功能、行为变化、Bug 修复、面向用户的破坏性变更。纯重构、测试、构建、内部依赖升级（除非影响用户）一般不记。来自 issue 的变更在条目末尾附 `(#编号)`。
+
+**Where / 写到哪** — 日常一律写入顶部的 `## [Unreleased]`。已发布的版本节（如 `## 1.3.2 - 2026-06-14`）**只读，永不修改**。写入前先读完整个 `[Unreleased]`，往已有小节追加，不要重复建小节。
+
+**Sections / 小节** — `### 新增 / Added`、`### 变更 / Changed`、`### 修复 / Fixed`、`### 移除 / Removed`、`### 破坏性变更 / Breaking Changes`（按需出现）。
+
+**Bilingual layout / 双语排版** — 每个小节正文**先列全部中文条目，空一行，再列全部对应英文条目**（顺序一一对应），不要逐行中英并排、不用 `/` 在条目内分隔中英。小节标题用 `中文 / English`。
+
+**Release cut-over / 发版收口** — 在改 `package.json` 版本号的发版提交里，把 `## [Unreleased]` 重命名为 `## X.Y.Z - YYYY-MM-DD`，并在顶部补一个新的空 `## [Unreleased]`。这一步**由人/AI 手动完成**（可用 `/cl` prompt 辅助审计补漏），**CI 不自动搬运** `[Unreleased]` 内容——CI 仅负责按 Changelog 内容发布 Release notes。
+
 ## Post-Task Code Review
 
 After completing all coding for a task, invoke the `code-review` agent as a subagent to perform a senior-level code review. Fix any issues found before reporting completion.
+
+The review must also confirm the **Changelog gate**: if the task carries user-visible changes, check that `## [Unreleased]` was updated and that the new entries follow the format in the Changelog section (bilingual blocks, correct subsection, no edits to released version sections).
