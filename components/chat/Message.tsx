@@ -320,9 +320,9 @@ export function AskUserBlock({
 
   return (
     <div className={`relative mt-3 p-3.5 border border-primary/20 bg-primary/5 rounded-lg ${answered ? 'opacity-60' : ''}`}>
-      <div className="flex items-center gap-2 text-primary font-medium text-[0.85rem] mb-1.5">
-        <CircleHelp className="size-4.5 shrink-0" />
-        {question}
+      <div className="flex items-start gap-2 text-primary font-medium text-[0.85rem] mb-1.5">
+        <CircleHelp className="size-4.5 shrink-0 mt-0.5" />
+        <span className="whitespace-pre-wrap">{question}</span>
       </div>
 
       {/* Option buttons */}
@@ -403,9 +403,9 @@ export function PermissionRequestBlock({
 
   return (
     <div className={`relative mt-3 p-3.5 border border-primary/20 bg-primary/5 rounded-lg ${answerable ? '' : 'opacity-60'}`}>
-      <div className="flex items-center gap-2 text-primary font-medium text-[0.85rem] mb-1.5">
-        <ShieldAlert className="size-4.5 shrink-0" />
-        {title}
+      <div className="flex items-start gap-2 text-primary font-medium text-[0.85rem] mb-1.5">
+        <ShieldAlert className="size-4.5 shrink-0 mt-0.5" />
+        <span className="whitespace-pre-wrap">{title}</span>
       </div>
 
       {/* Requested permissions — omitted entirely when none declared */}

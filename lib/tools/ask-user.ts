@@ -6,7 +6,11 @@ import { TOOL_ASK_USER } from '@/lib/tools/names';
 // ─── Request type ───
 
 const AskUserParameters = Type.Object({
-  question: Type.String({ description: 'The question to ask the user.' }),
+  question: Type.String({
+    description:
+      'The question to ask the user. Plain text only — Markdown is not rendered. ' +
+      'Use newline characters (\\n) for line breaks.',
+  }),
   options: Type.Optional(
     Type.Array(
       Type.Object({
