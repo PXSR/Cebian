@@ -366,6 +366,21 @@ class AgentManager {
       }
     }
 
+    // OpenRouter app 归因：附带固定的 HTTP-Referer / X-Title，让请求在
+    // OpenRouter 的应用榜单与各模型页的 Apps Tab 中归因到 Cebian。pi-ai 会把
+    // model.headers 合并进请求头。仅对 openrouter 注入，不影响其它 provider；
+    // 不含任何用户数据，只标明「该请求来自 Cebian」。
+    if (modelCfg.provider === 'openrouter') {
+      model = {
+        ...model,
+        headers: {
+          ...model.headers,
+          'HTTP-Referer': 'https://cebian.catcat.work',
+          'X-Title': 'Cebian',
+        },
+      };
+    }
+
     return { model, provider: modelCfg.provider, modelId: modelCfg.modelId };
   }
 

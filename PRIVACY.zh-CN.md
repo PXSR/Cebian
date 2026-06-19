@@ -112,6 +112,8 @@ Cebian 作者**不运行任何服务器**。没有代理、没有埋点端点、
 
 数据离开浏览器后，由对应服务商的隐私政策约束。它们是否记录、保留、或将你的输入用于训练，**完全由它们的条款决定**——Cebian 对此既没有可见性也没有控制权。请在启用任何服务商前查阅它们的隐私政策。
 
+**OpenRouter 应用归因。**当你选择 OpenRouter 作为服务商时，Cebian 会在每个请求的请求头里附带两个固定的应用标识（`HTTP-Referer: https://cebian.catcat.work` 与 `X-Title: Cebian`），以便该流量在 OpenRouter 的公开应用榜单以及各模型页的「Apps」 Tab 中归因到 Cebian。这两个请求头**不含任何用户数据**——仅标明「该请求来自 Cebian」——且只对 OpenRouter 发送。
+
 如果你通过 MCP（Model Context Protocol）接入了外部工具，对那些端点同样适用上述说明。
 
 ---

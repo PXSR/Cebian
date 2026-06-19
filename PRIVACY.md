@@ -139,6 +139,14 @@ Whether they retain, log, or use your input for model training is **entirely
 governed by their terms** — Cebian has no visibility into or control over that.
 Please review the privacy policy of any provider you enable.
 
+**OpenRouter app attribution.** When you choose OpenRouter as your provider,
+Cebian attaches two fixed app-identifying headers to each request
+(`HTTP-Referer: https://cebian.catcat.work` and `X-Title: Cebian`) so that the
+traffic is attributed to Cebian on OpenRouter's public app rankings and the
+"Apps" tab of each model page. These two headers contain **no user data** —
+they only mark "this request comes from Cebian" — and are sent to OpenRouter
+only.
+
 If you connect external tools via MCP (Model Context Protocol), the same applies
 to those endpoints.
 
