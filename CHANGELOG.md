@@ -33,11 +33,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 工具执行中点击停止后，工具卡片不再一直显示加载图标，「已取消」提示也移到工具卡片下方 (#21)
 - 询问用户/权限确认卡片的文本现在保留换行，多行时图标与首行对齐 (#23)
 - 文件编辑页窄屏布局下，右键删除文件时不再误把该文件重新打开 (#22)
+- 修复 AI 偶尔不读取页面、凭记忆编造链接就跳转的问题：现在要求链接地址必须来自页面真实 \`href\`、用户输入或工具结果，仅允许基于页面上可见样本的推导（如可见的 \`?page=2\` 翻到 \`?page=3\`），并在跳转失败时回退到重新读取页面
 
 - Use the user-provided name for backup filenames
 - Avoid the 64 MiB runtime message limit on session backup and restore
 - Stop the tool card from spinning forever after cancelling a running tool, and move the "Cancelled" marker below the tool card (#21)
 - Preserve line breaks in ask-user and permission-prompt card text, and align the icon to the first line for multi-line text (#23)
+- Fixed the AI occasionally navigating to a URL invented from memory instead of reading the page: link addresses must now come from a real page \`href\`, user input, or a tool result, with derivation allowed only from a sample visible on the page (e.g. bumping a visible \`?page=2\` to \`?page=3\`), and a fallback to re-read the page when navigation fails
 - File editor: deleting a file from the right-click menu no longer spuriously reopens it in the compact (narrow) layout (#22)
 
 ### 变更 / Changed
