@@ -8,11 +8,11 @@
 import type { WxtStorageItem } from 'wxt/utils/storage';
 import type { RestoreStrategy } from './types';
 import {
-  activeModel,
+  lastSelectedModel,
   customProviders,
   userInstructions,
   themePreference,
-  thinkingLevel,
+  lastSelectedThinkingLevel,
   mcpServers,
   providerCredentials,
   webdavConfig,
@@ -204,7 +204,7 @@ function entry<T>(e: BackupEntry<T>): BackupEntry<any> {
  * 否则 lib/backup/registry.test.ts 会失败。
  */
 export const BACKUP_REGISTRY: BackupEntry<any>[] = [
-  entry({ item: activeModel, storageClass: 'settings' }),
+  entry({ item: lastSelectedModel, storageClass: 'settings' }),
   entry({
     item: customProviders,
     storageClass: 'settings',
@@ -215,7 +215,7 @@ export const BACKUP_REGISTRY: BackupEntry<any>[] = [
   }),
   entry({ item: userInstructions, storageClass: 'settings' }),
   entry({ item: themePreference, storageClass: 'settings' }),
-  entry({ item: thinkingLevel, storageClass: 'settings' }),
+  entry({ item: lastSelectedThinkingLevel, storageClass: 'settings' }),
   entry({
     item: mcpServers,
     storageClass: 'settings',

@@ -21,9 +21,12 @@ export type ProviderCredential = ApiKeyCredential | OAuthCredential;
 
 export type ProviderCredentials = Record<string, ProviderCredential>;
 
-// ─── Active model ───
+// ─── Model identity ───
 
-export interface ActiveModel {
+/** 一个模型的轻量身份标识（provider key + modelId），可解析成 pi-ai 的运行时
+ *  `Model`。既用于全局「新对话默认模型」存储项 `lastSelectedModel`，也用于会话行 /
+ *  prompt 携带的「本次所用模型」。 */
+export interface ModelIdentity {
   provider: string;
   modelId: string;
 }
@@ -109,7 +112,7 @@ export const providerCredentials = storage.defineItem<ProviderCredentials>(
   { fallback: {} },
 );
 
-export const activeModel = storage.defineItem<ActiveModel | null>(
+export const lastSelectedModel = storage.defineItem<ModelIdentity | null>(
   'local:activeModel',
   { fallback: null },
 );
@@ -119,7 +122,7 @@ export const customProviders = storage.defineItem<CustomProviderConfig[]>(
   { fallback: [] },
 );
 
-export const thinkingLevel = storage.defineItem<ThinkingLevel>(
+export const lastSelectedThinkingLevel = storage.defineItem<ThinkingLevel>(
   'local:thinkingLevel',
   { fallback: 'medium' },
 );

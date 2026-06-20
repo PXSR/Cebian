@@ -19,8 +19,7 @@ import {
   shouldCompact,
 } from '@earendil-works/pi-agent-core';
 import type { Api, AssistantMessage, Model } from '@earendil-works/pi-ai';
-import { getModels, type KnownProvider } from '@earendil-works/pi-ai';
-import { createCebianAgent, resolveProviderApiKey, buildSystemPrompt } from './agent';
+import { createCebianAgent, resolveProviderApiKey, composeUserMessage, composeSystemPrompt } from './agent';
 import {
   COMPACTION_SETTINGS,
   findCompactionCutPoint,
@@ -29,10 +28,8 @@ import {
   isCompactionSummary,
   type CompactionSummaryMessage,
 } from '@/lib/agent/compaction';
-import { scanSkillIndex, buildSkillsBlock } from '@/lib/ai-config/scanner';
 import { sessionStore } from './session-store';
-import { gatherPageContext } from '@/lib/agent/page-context';
-import { buildTextPrefix, extractImages, type Attachment } from '@/lib/agent/attachments';
+import { extractImages, type Attachment } from '@/lib/agent/attachments';
 import { createSessionTools, buildSessionToolArray } from '@/lib/tools';
 import { runSkillGate } from '@/lib/tools/run-skill';
 import type { SessionToolContext } from '@/lib/tools/session-context';
@@ -49,50 +46,21 @@ import {
   type PermissionDecision,
   type ToolGate,
 } from '@/lib/agent/tool-permissions';
-import type { ServerMessage } from '@/lib/ipc/protocol';
+import type { ServerMessage, TurnSettings } from '@/lib/ipc/protocol';
 import type { SessionRecord } from '@/lib/persistence/db';
 import { truncateForRetry } from '@/lib/agent/message-helpers';
 import {
   providerCredentials,
   customProviders as customProvidersStorage,
-  activeModel as activeModelStorage,
-  thinkingLevel as thinkingLevelStorage,
+  lastSelectedModel,
+  lastSelectedThinkingLevel,
   userInstructions as userInstructionsStorage,
+  type ModelIdentity,
 } from '@/lib/persistence/storage';
 import { getMCPManager } from '@/lib/mcp/manager';
-import { getCopilotBaseUrl } from '@/lib/providers/oauth';
-import { isCustomProvider, findCustomModel } from '@/lib/providers/custom-models';
+import { resolveModel } from '@/lib/providers/resolve-model';
 import { t } from '@/lib/i18n';
 import { acquireKeepAlive, releaseKeepAlive } from './sw-keepalive';
-
-// ─── Structured user message builder ───
-
-async function buildStructuredMessage(text: string, attachments: Attachment[]): Promise<string> {
-  const parts: string[] = [];
-
-  // ① Tool/behavior reminders (placeholder)
-  parts.push('<reminder-instructions>\n</reminder-instructions>');
-
-  // ② Attachments (elements + files; images go via multimodal content blocks)
-  const attachmentBlock = buildTextPrefix(attachments);
-  if (attachmentBlock) parts.push(attachmentBlock);
-
-  // ③ Context: date + page state
-  const ctxLines: string[] = [];
-  ctxLines.push(`The current date is ${new Date().toLocaleDateString('en-CA')}.`);
-  const pageCtx = await gatherPageContext();
-  if (pageCtx) {
-    ctxLines.push('');
-    ctxLines.push(pageCtx);
-  }
-  parts.push(`<context>\n${ctxLines.join('\n')}\n</context>`);
-
-  // ④ User request (always last)
-  // TODO: user text is NOT sanitized — users are trusted; stripping structural tags would alter their intent.
-  parts.push(`<user-request>\n${text.trim()}\n</user-request>`);
-
-  return parts.join('\n\n');
-}
 
 // ─── Types ───
 
@@ -337,49 +305,27 @@ class AgentManager {
     }
   }
 
-  private async resolveModelObj(): Promise<{ model: Model<Api>; provider: string; modelId: string } | null> {
-    const [modelCfg, creds, customProvs] = await Promise.all([
-      activeModelStorage.getValue(),
+  /**
+   * 解析「本会话该用哪个模型」成 pi-ai 运行时 `Model`。读存储（凭据 + 自定义 provider）
+   * 后委托纯函数 `resolveModel`。
+   *
+   * `identity` 是「本会话的模型身份」——来自会话行或 prompt/retry 携带值；缺省（undefined）
+   * 时回退到全局 `lastSelectedModel` 充当「新对话默认种子」（向后兼容：旧消息 / 旧会话行
+   * 无模型时仍能解析）。解析失败返回 null，由调用方诚实报错。
+   */
+  private async resolveSessionModel(
+    identity?: ModelIdentity,
+  ): Promise<{ model: Model<Api>; provider: string; modelId: string } | null> {
+    const [globalModel, creds, customProvs] = await Promise.all([
+      identity ? Promise.resolve(null) : lastSelectedModel.getValue(),
       providerCredentials.getValue(),
       customProvidersStorage.getValue(),
     ]);
+    const modelCfg = identity ?? globalModel;
     if (!modelCfg) return null;
 
-    let model: Model<Api> | undefined;
-
-    if (isCustomProvider(modelCfg.provider)) {
-      model = findCustomModel(customProvs ?? [], modelCfg.provider, modelCfg.modelId) ?? undefined;
-    } else {
-      try {
-        const models = getModels(modelCfg.provider as KnownProvider) as Model<Api>[];
-        model = models.find(m => m.id === modelCfg.modelId);
-      } catch {
-        return null;
-      }
-    }
+    const model = resolveModel(modelCfg, creds, customProvs ?? []);
     if (!model) return null;
-
-    if (modelCfg.provider === 'github-copilot') {
-      const cred = creds[modelCfg.provider];
-      if (cred?.authType === 'oauth') {
-        model = { ...model, baseUrl: getCopilotBaseUrl(cred) };
-      }
-    }
-
-    // OpenRouter app 归因：附带固定的 HTTP-Referer / X-Title，让请求在
-    // OpenRouter 的应用榜单与各模型页的 Apps Tab 中归因到 Cebian。pi-ai 会把
-    // model.headers 合并进请求头。仅对 openrouter 注入，不影响其它 provider；
-    // 不含任何用户数据，只标明「该请求来自 Cebian」。
-    if (modelCfg.provider === 'openrouter') {
-      model = {
-        ...model,
-        headers: {
-          ...model.headers,
-          'HTTP-Referer': 'https://cebian.catcat.work',
-          'X-Title': 'Cebian',
-        },
-      };
-    }
 
     return { model, provider: modelCfg.provider, modelId: modelCfg.modelId };
   }
@@ -403,71 +349,35 @@ class AgentManager {
     }
   }
 
-  /** Internal: actually create the agent (called only once per session). */
+  /**
+   * 创建并安装一个 managed 会话（每会话仅一次，由 `getOrCreateAgent` 的 `creating`
+   * 去重守卫）。流程：加载会话行（本会话模型 / 思考档的真相来源）→ 解析模型 →
+   * 造每会话独立工具 + 授权 bridge → 一次成形 systemPrompt → 构造 Agent → wire 订阅
+   * → 入 map。
+   *
+   * 到达这里时会话行一定已存在：brand-new 会话的行由 prompt() 在本函数前写好（带本轮
+   * 携带的选择），已有会话的行带它自己存的选择。in-place 的 retry / 切模型路径复用活
+   * agent，不走这里。
+   */
   private async createAgent(sessionId: string): Promise<ManagedSession> {
-    const built = await this.buildAgentArtifacts(sessionId);
-    const managed: ManagedSession = {
-      agent: built.agent,
-      sessionId,
-      sessionCreated: built.sessionCreated,
-      phase: 'idle',
-      modelKey: built.modelKey,
-      toolCtx: built.toolCtx,
-      permissionBridge: built.permissionBridge,
-      unsubscribeAgent: () => {},
-    };
-    this.wireSubscriptions(managed);
-    this.sessions.set(sessionId, managed);
-    return managed;
-  }
-
-  /**
-   * 组装会话的 systemPrompt——systemPrompt 的单一来源。读取用户指令 + 扫描 skills
-   * 索引（命中缓存，开销≈ 0），交给纯函数 `buildSystemPrompt` 拼接。每轮派发前无
-   * 条件调用：skills 不变则产出逐字节相同的字符串、命中 system 缓存；skills 变则产
-   * 出变化、击穿缓存一次（= 装/卸 skill 的实时性代价）。因此无需写「skills 是否变
-   * 化」的 diff 逻辑。
-   */
-  private async composeSystemPrompt(sessionId: string): Promise<string> {
-    const [instructions, skillMetas] = await Promise.all([
-      userInstructionsStorage.getValue(),
-      scanSkillIndex(),
-    ]);
-    const skillsBlock = buildSkillsBlock(skillMetas);
-    return buildSystemPrompt(sessionId, instructions || '', skillsBlock);
-  }
-
-  /**
-   * Build a fresh Agent + tool context for a session without installing it
-   * into the managed map or wiring subscriptions. Returns raw artifacts so
-   * `createAgent` can construct a brand-new managed entry and write it to the
-   * map. Messages are loaded from DB (`sessionCreated` reflects whether a row
-   * existed); the in-place retry / model-switch paths refresh the live agent
-   * directly and never go through here.
-   */
-  private async buildAgentArtifacts(
-    sessionId: string,
-  ): Promise<{
-    agent: Agent;
-    toolCtx: SessionToolContext;
-    permissionBridge: InteractiveBridge<PermissionRequest, PermissionDecision>;
-    modelKey: string;
-    sessionCreated: boolean;
-  }> {
-    const resolved = await this.resolveModelObj();
-    if (!resolved) throw new Error('No model selected or model not found');
-
-    const [thinkingLvl, instructions] = await Promise.all([
-      thinkingLevelStorage.getValue(),
-      userInstructionsStorage.getValue(),
-    ]);
-
-    // Load the transcript from DB; a brand-new session has no row yet.
+    // 会话行 = 本会话模型 / 思考档的真相来源。
     const existingSession = await sessionStore.load(sessionId);
     const messages: AgentMessage[] = existingSession?.messages ?? [];
     const sessionCreated = !!existingSession;
 
-    // Create per-session tools with isolated bridges
+    // 从会话行自己的模型身份解析（而非全局 lastSelectedModel）。行里没有可用模型（空串 /
+    // 旧备份恢复来的）时传 undefined，让 resolveSessionModel 回退全局；仍解析不出则
+    // throw（诚实报错，让用户重选），与 prompt / retry 三路一致。
+    const sessionIdentity: ModelIdentity | undefined =
+      existingSession?.provider && existingSession?.model
+        ? { provider: existingSession.provider, modelId: existingSession.model }
+        : undefined;
+    const resolved = await this.resolveSessionModel(sessionIdentity);
+    if (!resolved) throw new Error('No model selected or model not found');
+
+    const thinkingLvl = existingSession?.thinkingLevel || (await lastSelectedThinkingLevel.getValue());
+
+    // 每会话独立的工具 + bridge。
     const { tools: sessionTools, ctx: toolCtx } = await createSessionTools(sessionId);
 
     // 工具执行前授权门禁：每会话一个独立 bridge；用它构造绑定到本会话
@@ -480,29 +390,33 @@ class AgentManager {
       (request, signal) => this.requestPermissionDecision(sessionId, request, signal),
     );
 
+    // systemPrompt 一次成形（含 skills 索引 + 用户指令）。composeSystemPrompt 是
+    // systemPrompt 的单一来源，与切模型 / retry / 派发前刷新走同一条路径，保证四处
+    // 产出逐字节一致。
+    const systemPrompt = await composeSystemPrompt(sessionId);
+
     const agent = createCebianAgent({
       model: resolved.model,
-      sessionId,
-      userInstructions: instructions || '',
+      systemPrompt,
       thinkingLevel: (thinkingLvl || 'medium') as any,
       messages,
       tools: sessionTools,
       beforeToolCall,
     });
 
-    // skills 索引随会话级 system prompt 注入（迁出每条用户消息以吃满 prompt
-    // caching）。createCebianAgent 内部只拼了 base + instructions，这里用
-    // composeSystemPrompt 覆盖一次补上 skills——与切模型 / retry / 派发前刷新
-    // 走同一条 composeSystemPrompt 路径，保证四处产出逐字节一致。
-    agent.state.systemPrompt = await this.composeSystemPrompt(sessionId);
-
-    return {
+    const managed: ManagedSession = {
       agent,
+      sessionId,
+      sessionCreated,
+      phase: 'idle',
+      modelKey: `${resolved.provider}/${resolved.modelId}`,
       toolCtx,
       permissionBridge,
-      modelKey: `${resolved.provider}/${resolved.modelId}`,
-      sessionCreated,
+      unsubscribeAgent: () => {},
     };
+    this.wireSubscriptions(managed);
+    this.sessions.set(sessionId, managed);
+    return managed;
   }
 
   /**
@@ -615,8 +529,17 @@ class AgentManager {
     }
   }
 
-  /** Send a prompt to the agent for a session */
-  async prompt(sessionId: string, text: string, attachments: Attachment[] = []): Promise<void> {
+  /** Send a prompt to the agent for a session.
+   *
+   *  `turn` 是页面随本条消息携带的「本次发送所用的模型 / 思考档」——属于该会话
+   *  的选择。新会话据它建行；已有会话据它就地刷新活 agent 并落库到会话行（会话
+   *  行是真相）。缺省时回退全局 lastSelectedModel 充当「新对话默认种子」（向后兼容）。 */
+  async prompt(
+    sessionId: string,
+    text: string,
+    attachments: Attachment[] = [],
+    turn?: TurnSettings,
+  ): Promise<void> {
     // Persist + broadcast 'session_created' for brand-new sessions BEFORE any
     // agent setup work (model resolve, tool factory, MCP, createAgent — easily
     // several hundred ms). Without this the UI stays on /chat/new with an empty
@@ -629,14 +552,15 @@ class AgentManager {
     if (!this.sessions.has(sessionId)) {
       const existing = await sessionStore.load(sessionId);
       if (!existing) {
-        const [modelCfg, instructions, thinkingLvl] = await Promise.all([
-          activeModelStorage.getValue(),
+        const [globalModel, instructions, globalThinking] = await Promise.all([
+          lastSelectedModel.getValue(),
           userInstructionsStorage.getValue(),
-          thinkingLevelStorage.getValue(),
+          lastSelectedThinkingLevel.getValue(),
         ]);
-        // Mirror the old behavior: refuse to create a session row when no
-        // model is selected. Otherwise the subsequent getOrCreateAgent() throws
-        // and we'd leave an orphan empty-model row in Dexie + history.
+        // 建行用本轮携带的 turn；缺省回退全局种子。模型仍为空则拒绝建行
+        // （否则后续 getOrCreateAgent 会 throw，留下一条空模型的孤儿会话行）。
+        const modelCfg = turn?.model ?? globalModel;
+        const thinkingLvl = turn?.thinkingLevel ?? globalThinking;
         if (!modelCfg) {
           throw new Error('No model selected or model not found');
         }
@@ -684,41 +608,49 @@ class AgentManager {
       return;
     }
 
-    // Check if the model has changed since the agent was created
-    const currentModel = await activeModelStorage.getValue();
-    if (currentModel) {
-      const currentKey = `${currentModel.provider}/${currentModel.modelId}`;
-      if (currentKey !== managed.modelKey) {
-        // Model changed since the agent was created — refresh the live agent
-        // in place. Unlike retry there is no resume/cancel window here:
-        // swapping state is a synchronous field assign and the normal prompt
-        // dispatch below fires `agent_start`, so we don't enter a `preparing`
-        // phase or arm a controller. We refresh model + thinkingLevel +
-        // systemPrompt together (matching retry and the old rebuild path's
-        // side effect) so switching model also picks up thinking / instruction
-        // changes made while idle. `resolveModelObj` re-reads storage to pick
-        // up custom providers / copilot OAuth baseUrl exactly like agent
-        // creation. If resolution fails (model deleted or credentials pulled
-        // in a parallel tab) we throw, exactly like `buildAgentArtifacts` and
-        // `retry` do — all three model-resolution paths report the same
-        // honest error rather than silently dispatching under a stale model
-        // the user is no longer pointing at.
-        const resolved = await this.resolveModelObj();
+    // 模型 / 思考档切换检测：以本轮携带的 turn 为准（而非全局）。model 与
+    // thinkingLevel 在协议里各自可选，故分别判断、分别落库——只要任一项变了就刷新活
+    // agent 并把变的字段写回会话行（会话行是真相）。turn 缺省（旧客户端不带）时整段
+    // 跳过，活 agent 保持会话选择不动。
+    if (turn) {
+      const turnKey = turn.model
+        ? `${turn.model.provider}/${turn.model.modelId}`
+        : null;
+      const modelChanged = turnKey != null && turnKey !== managed.modelKey;
+      const thinkingChanged =
+        turn.thinkingLevel != null &&
+        turn.thinkingLevel !== managed.agent.state.thinkingLevel;
+      if (modelChanged) {
+        // 就地刷新活 agent。与 retry 不同，这里没有 resume/cancel 窗口：换字段是同步
+        // 赋值，下面正常派发会触发 agent_start，故不进 preparing、不挂 controller。
+        // `resolveSessionModel` 按 turn 身份解析（自定义 provider 查表 / copilot OAuth
+        // baseUrl / openrouter 头一致）。解析失败（模型被删 / 凭据被并行 tab 拔掉）则
+        // throw，与 createAgent / retry 三路一致地诚实报错。
+        const resolved = await this.resolveSessionModel(turn.model);
         if (!resolved) throw new Error('No model selected or model not found');
-        const thinkingLvl = await thinkingLevelStorage.getValue();
         managed.agent.state.model = resolved.model;
-        managed.agent.state.thinkingLevel = (thinkingLvl || 'medium') as any;
-        managed.modelKey = currentKey;
+        managed.modelKey = turnKey!;
+      }
+      if (thinkingChanged) {
+        managed.agent.state.thinkingLevel = turn.thinkingLevel as any;
+      }
+      // 落库到会话行——会话行是真相来源。只写变了的字段；全都没变则不调 updateSettings。
+      if (managed.sessionCreated && (modelChanged || thinkingChanged)) {
+        await sessionStore.updateSettings(sessionId, {
+          provider: modelChanged ? turn.model!.provider : undefined,
+          model: modelChanged ? turn.model!.modelId : undefined,
+          thinkingLevel: thinkingChanged ? turn.thinkingLevel : undefined,
+        });
       }
     }
 
-    const enriched = await buildStructuredMessage(text, attachments);
+    const enriched = await composeUserMessage(text, attachments);
 
     const images = extractImages(attachments);
 
     // Liveness guard. Everything from `getOrCreateAgent` down to the dispatch
     // below runs while `phase === 'idle'` (model resolve, settings reads,
-    // `buildStructuredMessage` — the latter can be slow for image
+    // `composeUserMessage` — the latter can be slow for image
     // attachments). A `cancel()` landing in that window takes its idle
     // teardown branch (abort + dispose + `sessions.delete`), leaving `managed`
     // detached. Dispatching now would steer/prompt a disposed agent, waste an
@@ -727,7 +659,7 @@ class AgentManager {
     // turn — bail; `cancel()` already broadcast the authoritative end state.
     if (this.sessions.get(sessionId) !== managed) return;
 
-    const refreshedSystemPrompt = await this.composeSystemPrompt(sessionId);
+    const refreshedSystemPrompt = await composeSystemPrompt(sessionId);
     if (this.sessions.get(sessionId) !== managed) return;
     managed.agent.state.systemPrompt = refreshedSystemPrompt;
 
@@ -780,27 +712,27 @@ class AgentManager {
    * Compact the session transcript before a fresh turn when the context
    * exceeds the configured threshold.
    *
-   * Lossless design (方案 X): the original messages stay in
+   * Lossless design: the original messages stay in
    * `agent.state.messages` forever — we only *insert* a `compactionSummary`
    * marker at a turn-start boundary. The LLM-facing fold (keep only the last
    * summary + everything after it) happens later in `transformContext`; this
    * method never drops history.
    *
    * Flow:
-   * 1. Estimate context tokens (㊃: last assistant `usage.totalTokens` +
+   * 1. Estimate context tokens (last assistant `usage.totalTokens` +
    *    trailing char/4) and bail if under threshold.
-   * 2. Find a cut point aligned to a user turn-start (㊀: excludes toolResult
+   * 2. Find a cut point aligned to a user turn-start (excludes toolResult
    *    mid-turn — this is the root-cause fix for issue #9's orphan toolResult
    *    → provider 400).
-   * 3. Roll the summary (③): the summarized region is the delta *since the
+   * 3. Roll the summary: the summarized region is the delta *since the
    *    last summary*, and the previous summary text is fed to `generateSummary`
    *    as `previousSummary` for an UPDATE-style merge. Multiple summaries
    *    accumulate physically; `transformContext` only ever sends the last one.
    * 4. On success, splice the new summary right before the cut user message
-   *    and persist. On failure (after one internal retry, ㊅), skip the
+   *    and persist. On failure (after one internal retry), skip the
    *    summary and send anyway — the turn-start-aligned cut guarantees no 400.
    *
-   * Concurrency (㊆): runs under `phase === 'compacting'` with a dedicated
+   * Concurrency: runs under `phase === 'compacting'` with a dedicated
    * `compactionController`. `cancel()` aborts it; the top-of-`prompt()` guard
    * drops concurrent prompts. Keep-alive is held automatically because
    * `phase !== 'idle'`.
@@ -818,14 +750,14 @@ class AgentManager {
     const messages = managed.agent.state.messages;
     const model = managed.agent.state.model;
 
-    // ㊃ token 估算：优先读最后一条 assistant 的真实 usage，尾部按 char/4 估算。
+    // token 估算：优先读最后一条 assistant 的真实 usage，尾部按 char/4 估算。
     const { tokens } = estimateContextTokens(messages);
     if (!shouldCompact(tokens, model.contextWindow, COMPACTION_SETTINGS)) return false;
 
-    // ㊀ 切点对齐到 user turn-start（排除 toolResult 中间），修 issue #9。
+    // 切点对齐到 user turn-start（排除 toolResult 中间），修 issue #9。
     const cut = findCompactionCutPoint(messages, COMPACTION_SETTINGS.keepRecentTokens);
 
-    // ③ 滚动摘要：定位上一条摘要，待摘要区间是「上一条摘要之后 → 新切点」的增量
+    // 滚动摘要：定位上一条摘要，待摘要区间是「上一条摘要之后 → 新切点」的增量
     //（更早的历史已被旧摘要覆盖，无需重复总结），旧摘要文本作为 previousSummary
     // 喂给 generateSummary 做 UPDATE 合并。
     let lastSummaryIdx = -1;
@@ -841,7 +773,7 @@ class AgentManager {
     // 切点未越过「上一条摘要之后」→ 自上次压缩以来没有新的可摘要历史，跳过。
     if (cut <= baseIdx) return false;
 
-    // ① 进入 compacting 阶段：占用非 idle 状态（自动保活 + 阻止并发 prompt）。
+    // 进入 compacting 阶段：占用非 idle 状态（自动保活 + 阻止并发 prompt）。
     // 这一步在「任何 await 之前」同步完成，把可取消的忙碌态原子地占住——否则在
     // 解析 apiKey 的 await 窗口里若发生 cancel，会落进 idle 分支拆掉会话，导致
     // 本方法事后往已删除的会话写入并广播（评审指出的竞态）。
@@ -910,7 +842,7 @@ class AgentManager {
           pendingTools: [],
         });
       }
-      // summary 为 null → ㊅ 降级：runCompaction 内部已重试一次，这里不插摘要、
+      // summary 为 null → 降级：runCompaction 内部已重试一次，这里不插摘要、
       // 照常发送。findCompactionCutPoint 的 turn-start 对齐保证不会 400。
       return false;
     } finally {
@@ -1003,8 +935,14 @@ class AgentManager {
    *
    * No-op if no user message exists in the transcript (defensive throw),
    * or if phase is already non-`idle` (concurrent retry or live run).
+   *
+   * `turn` 同 prompt：本轮重试携带的模型 / 思考档。带它且与活 agent 当前选择不同
+   * 时才换并落库；不带（或相同）时保持活 agent 当前的会话选择不动。
    */
-  async retry(sessionId: string): Promise<void> {
+  async retry(
+    sessionId: string,
+    turn?: TurnSettings,
+  ): Promise<void> {
     // Cold-load if needed. If multiple retry() calls land concurrently for
     // a session not yet in the map, they all await the same in-flight
     // createAgent promise via the `creating` map, then race for the
@@ -1057,13 +995,19 @@ class AgentManager {
         await sessionStore.flush(sessionId);
       }
 
-      // Refresh settings in place — pick up model / thinking / instruction
-      // changes the user made while idle. The agent stays alive throughout;
-      // there is no teardown or rebuild. Tools are kept live by
-      // `refreshAllSessionTools` (MCP changes), so we don't touch them.
-      const resolved = await this.resolveModelObj();
-      if (!resolved) throw new Error('No model selected or model not found');
-      const thinkingLvl = await thinkingLevelStorage.getValue();
+      // 模型 / 思考档：仅当 retry 携带 turn（用户在重试前切了模型 / 思考）且与活
+      // agent 当前选择不同时才换并落库；否则保持不动——没有「空闲时改了
+      // 全局」需要补读的场景。Tools 由 `refreshAllSessionTools` 保活（MCP 变更），
+      // 此处不动。model 与 thinking 各自可选、分别判断、分别落库。
+      const turnKey = turn?.model
+        ? `${turn.model.provider}/${turn.model.modelId}`
+        : null;
+      const modelChanged = turnKey != null && turnKey !== managed.modelKey;
+      const thinkingChanged =
+        turn?.thinkingLevel != null &&
+        turn.thinkingLevel !== managed.agent.state.thinkingLevel;
+      const resolved = modelChanged ? await this.resolveSessionModel(turn!.model) : null;
+      if (modelChanged && !resolved) throw new Error('No model selected or model not found');
 
       // Single abort checkpoint — cancel landed during the DB flush or the
       // async settings load, both BEFORE we mutate the agent. Commit an
@@ -1079,9 +1023,21 @@ class AgentManager {
       managed.toolCtx.cancelAll();
       managed.permissionBridge.cancel();
       managed.agent.state.messages = truncated;
-      managed.agent.state.model = resolved.model;
-      managed.agent.state.thinkingLevel = (thinkingLvl || 'medium') as any;
-      managed.modelKey = `${resolved.provider}/${resolved.modelId}`;
+      if (resolved) {
+        managed.agent.state.model = resolved.model;
+        managed.modelKey = turnKey!;
+      }
+      if (thinkingChanged) {
+        managed.agent.state.thinkingLevel = turn!.thinkingLevel as any;
+      }
+      // 落库到会话行——会话行是真相来源。只写变了的字段。
+      if (managed.sessionCreated && (modelChanged || thinkingChanged)) {
+        await sessionStore.updateSettings(sessionId, {
+          provider: modelChanged ? turn!.model!.provider : undefined,
+          model: modelChanged ? turn!.model!.modelId : undefined,
+          thinkingLevel: thinkingChanged ? turn!.thinkingLevel : undefined,
+        });
+      }
 
       // Re-broadcast busy. `continue()` is invoked on the very next line and
       // fires `agent_start` on entry, so the agent IS effectively running.
@@ -1104,7 +1060,7 @@ class AgentManager {
       // the old rebuild path, which had to delete the entry on failure).
       //
       // But if we threw AFTER pre-persisting the truncated transcript yet
-      // BEFORE mutating the agent (e.g. `resolveModelObj` rejected), the live
+      // BEFORE mutating the agent (e.g. `resolveSessionModel` rejected), the live
       // agent still holds the OLD full transcript while DB holds the truncated
       // one. Align in-memory state to the truncated snapshot so the next prompt
       // doesn't resurrect the messages retry just dropped, then unblock the UI.

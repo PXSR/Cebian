@@ -3,7 +3,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
-import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage, type SessionMeta } from '@/lib/ipc/protocol';
+import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage, type SessionMeta, type TurnSettings } from '@/lib/ipc/protocol';
 import type { SessionRecord } from '@/lib/persistence/db';
 import type { Attachment } from '@/lib/agent/attachments';
 import type { PermissionRequest } from '@/lib/agent/tool-permissions';
@@ -372,6 +372,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     text: string,
     attachments: Attachment[] | undefined,
     expectedSessionId: string | null,
+    turn?: TurnSettings,
   ): boolean => {
     if (sessionIdRef.current !== expectedSessionId) return false;
 
@@ -382,7 +383,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     const sessionId = existingSessionId ?? crypto.randomUUID();
 
     try {
-      port.postMessage({ type: 'prompt', sessionId, text, attachments });
+      port.postMessage({ type: 'prompt', sessionId, text, attachments, model: turn?.model, thinkingLevel: turn?.thinkingLevel });
     } catch {
       if (portRef.current === port) {
         portRef.current = null;
@@ -426,12 +427,13 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     text: string,
     attachments?: Attachment[],
     expectedSessionId: string | null = sessionIdRef.current,
+    turn?: TurnSettings,
   ): Promise<PromptDispatchResult> => {
     const trimmed = text.trim();
     if (!trimmed) return { status: 'notDispatched', reason: 'empty' };
 
     const startedSessionId = expectedSessionId;
-    if (dispatchPrompt(trimmed, attachments, startedSessionId)) return { status: 'dispatched' };
+    if (dispatchPrompt(trimmed, attachments, startedSessionId, turn)) return { status: 'dispatched' };
 
     const connected = await waitForConnected(PROMPT_RECONNECT_TIMEOUT_MS);
     if (!connected || sessionIdRef.current !== startedSessionId) {
@@ -441,7 +443,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
       return { status: 'notDispatched', reason: 'unavailable' };
     }
 
-    if (dispatchPrompt(trimmed, attachments, startedSessionId)) return { status: 'dispatched' };
+    if (dispatchPrompt(trimmed, attachments, startedSessionId, turn)) return { status: 'dispatched' };
 
     setState(prev => ({ ...prev, lastError: t('chat.session.notConnected') }));
     return { status: 'notDispatched', reason: 'unavailable' };
@@ -452,7 +454,9 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     if (sessionId) postMessage({ type: 'cancel', sessionId });
   }, [postMessage]);
 
-  const retry = useCallback(() => {
+  const retry = useCallback((
+    turn?: TurnSettings,
+  ) => {
     const sessionId = sessionIdRef.current;
     if (!sessionId) return;
     if (!portRef.current) {
@@ -488,7 +492,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
         lastError: null,
       };
     });
-    postMessage({ type: 'retry', sessionId });
+    postMessage({ type: 'retry', sessionId, model: turn?.model, thinkingLevel: turn?.thinkingLevel });
   }, [postMessage]);
 
   const subscribe = useCallback((sessionId: string) => {

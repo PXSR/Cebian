@@ -11,7 +11,7 @@ import { ThinkingLevelSelector } from '@/components/chat/ThinkingLevelSelector';
 import { RecordButton } from '@/components/chat/RecordButton';
 import { MicButton } from '@/components/chat/MicButton';
 import { useStorageItem } from '@/hooks/useStorageItem';
-import { activeModel, thinkingLevel, providerCredentials, customProviders as customProvidersStorage, type ThinkingLevel } from '@/lib/persistence/storage';
+import { providerCredentials, customProviders as customProvidersStorage, type ThinkingLevel, type ModelIdentity } from '@/lib/persistence/storage';
 import { getModel } from '@earendil-works/pi-ai';
 import { isCustomProvider, findCustomModel } from '@/lib/providers/custom-models';
 import { startElementPicker, cancelElementPicker } from '@/lib/browser/element-picker';
@@ -50,6 +50,12 @@ interface ChatInputProps {
   userHistory?: string[];
   /** Conversation id; changing it resets history navigation state. */
   sessionId?: string | null;
+  /** 本轮选中的模型 / 思考档（受控）。由 ChatPage 持有：新对话从全局种子 seed、
+   *  已有会话从会话行 seed；切换走 onModelChange / onThinkingChange。 */
+  model: ModelIdentity | null;
+  thinkingLevel: ThinkingLevel;
+  onModelChange: (model: ModelIdentity) => void;
+  onThinkingChange: (level: ThinkingLevel) => void;
 }
 
 /** 暴露给父组件的 imperative handle：允许欢迎页等外部入口填入文本并聚焦输入框，
@@ -59,7 +65,7 @@ export interface ChatInputHandle {
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
-  { onSend, onOpenSettings, isAgentRunning, onCancel, userHistory, sessionId },
+  { onSend, onOpenSettings, isAgentRunning, onCancel, userHistory, sessionId, model: currentModel, thinkingLevel: currentThinkingLevel, onModelChange, onThinkingChange },
   ref,
 ) {
   const [value, setValue] = useState('');
@@ -86,8 +92,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   const sessionIdRef = useRef<string | null>(sessionId ?? null);
   sessionIdRef.current = sessionId ?? null;
 
-  const [currentModel, setCurrentModel] = useStorageItem(activeModel, null);
-  const [currentThinkingLevel, setCurrentThinkingLevel] = useStorageItem(thinkingLevel, 'medium');
   const [providers] = useStorageItem(providerCredentials, {});
   const [customProviderList] = useStorageItem(customProvidersStorage, []);
 
@@ -140,11 +144,11 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   }, [supportsImage]);
 
   const handleModelSelect = useCallback((provider: string, modelId: string) => {
-    setCurrentModel({ provider, modelId });
-  }, [setCurrentModel]);
+    onModelChange({ provider, modelId });
+  }, [onModelChange]);
 
   const handleThinkingSelect = (level: ThinkingLevel) => {
-    setCurrentThinkingLevel(level);
+    onThinkingChange(level);
   };
 
   // ─── 语音输入（本地 on-device 识别）──────────────────────────────

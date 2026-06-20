@@ -388,7 +388,12 @@ export default defineBackground(() => {
         // For new sessions, agentManager.prompt() persists the session and
         // broadcasts 'session_created' before starting, so the client can
         // navigate to /chat/<id> immediately.
-        agentManager.prompt(sessionId, msg.text, msg.attachments).catch((err) => {
+        // model / thinkingLevel 是本轮携带的「该会话所用模型 / 思考档」，透传给
+        // prompt() 作 override（B1：会话行是真相，全局仅作新对话种子）。
+        agentManager.prompt(sessionId, msg.text, msg.attachments, {
+          model: msg.model,
+          thinkingLevel: msg.thinkingLevel,
+        }).catch((err) => {
           safePost(port, {
             type: 'error',
             sessionId,
@@ -412,7 +417,11 @@ export default defineBackground(() => {
         // "no user message found" / "agent already running" / model setup
         // failures consistently.
         state.subscribedSession = msg.sessionId;
-        agentManager.retry(msg.sessionId).catch((err) => {
+        // 同 prompt：透传本轮重试携带的 model / thinkingLevel 作 override。
+        agentManager.retry(msg.sessionId, {
+          model: msg.model,
+          thinkingLevel: msg.thinkingLevel,
+        }).catch((err) => {
           safePost(port, {
             type: 'error',
             sessionId: msg.sessionId,

@@ -2,6 +2,7 @@
 
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { SessionRecord } from '@/lib/persistence/db';
+import type { ModelIdentity, ThinkingLevel } from '@/lib/persistence/storage';
 import type { Attachment } from '@/lib/agent/attachments';
 import type { RecordedSession } from '@/lib/recorder/types';
 import type { MCPResourceContents } from '@/lib/mcp/client';
@@ -11,19 +12,37 @@ import type { PermissionRequest } from '@/lib/agent/tool-permissions';
 
 export const AGENT_PORT_NAME = 'cebian-agent';
 
+/**
+ * 一次发送 / 重试所携带的「本轮要用的模型 + 思考档」。属于该会话的选择，由发起的
+ * sidepanel 随 prompt / retry 消息带给后台（而非后台读全局）。两字段都可选：缺省时
+ * 后台回退到会话行 / 全局种子（向后兼容）。prompt / retry 协议消息与 agent-manager
+ * 的 override 参数、hook 的 turn 参数共用此形状，避免一个概念多份近似类型。
+ */
+export interface TurnSettings {
+  model?: ModelIdentity;
+  thinkingLevel?: ThinkingLevel;
+}
+
 // ─── Client → Background (requests) ───
 
 export type ClientMessage =
   | { type: 'subscribe'; sessionId: string }
   | { type: 'unsubscribe' }
-  | { type: 'prompt'; sessionId: string | null; text: string; attachments?: Attachment[] }
+  /** 发送一条用户消息。`model` / `thinkingLevel`（见 TurnSettings）是「本次发送所用的
+   *  模型 / 思考档」，由发起的 sidepanel 随消息携带（而非后台读全局），属于该会话的
+   *  选择。新会话据此建行；已有会话据此就地刷新活 agent 并落库到会话行（会话行是真相）。
+   *  缺省时后台回退到全局 lastSelectedModel 充当「新对话默认种子」（向后兼容）。 */
+  | ({ type: 'prompt'; sessionId: string | null; text: string; attachments?: Attachment[] } & TurnSettings)
   | { type: 'cancel'; sessionId: string }
   /** Re-run the last user turn for `sessionId`. The background drops any
    *  trailing assistant / toolResult messages (typically a failed turn or
    *  one the user is unhappy with) and resumes the agent loop from the most
    *  recent user message. No-op if no user message exists, or if the agent
-   *  is currently running. */
-  | { type: 'retry'; sessionId: string }
+   *  is currently running.
+   *
+   *  `model` / `thinkingLevel`（见 TurnSettings）同 prompt：携带「重试这一轮要用的
+   *  模型 / 思考档」，支持「换个更强的模型再重试」。缺省时保持会话当前选择不变。 */
+  | ({ type: 'retry'; sessionId: string } & TurnSettings)
   | { type: 'resolve_tool'; sessionId: string; toolName: string; response: any }
   | { type: 'cancel_tool'; sessionId: string; toolName: string }
   /** User's decision on a tool's pre-execution permission prompt, keyed by

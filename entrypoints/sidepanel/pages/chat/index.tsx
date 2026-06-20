@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowDown } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -38,7 +38,8 @@ import { isPermissionRequest } from '@/lib/agent/tool-permissions';
 import { useBackgroundAgent } from '@/hooks/useBackgroundAgent';
 import { useStickToBottom } from '@/hooks/useStickToBottom';
 import { useStorageItem } from '@/hooks/useStorageItem';
-import { activeModel } from '@/lib/persistence/storage';
+import { lastSelectedModel, lastSelectedThinkingLevel as thinkingLevelStorage, providerCredentials, customProviders, type ModelIdentity, type ThinkingLevel } from '@/lib/persistence/storage';
+import { hasUsableModel } from '@/lib/providers/usable-models';
 import type { Attachment } from '@/lib/agent/attachments';
 import type { SessionRecord } from '@/lib/persistence/db';
 import { t } from '@/lib/i18n';
@@ -50,8 +51,45 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
   const isNewChat = !routeSessionId || routeSessionId === 'new';
   const navigate = useNavigate();
 
-  // Only read activeModel for UI display (is a model selected?)
-  const [currentModel] = useStorageItem(activeModel, null);
+  // 本窗口 / 本对话「当前选中的模型 / 思考档」本地草稿。发送 / 重试时随消息带出作
+  // turn；新对话从全局种子 seed、已有会话从会话行（onSessionLoaded）seed。不直连全局
+  // storage，以免一个窗口切模型影响另一个。
+  const [turnModel, setTurnModel] = useState<ModelIdentity | null>(null);
+  const [turnThinking, setTurnThinking] = useState<ThinkingLevel>('medium');
+
+  // 是否存在至少一个可选模型（= 用户至少配好一个 provider）。驱动欢迎页空状态文案：
+  // 有 → 显示示例（引导去底部选模型）；无 → 引导去设置。响应式订阅 provider 凭据 /
+  // 自定义 provider——用户刚在设置里配好就实时反映，这正是 watch 的正当用途。
+  const [creds] = useStorageItem(providerCredentials, {});
+  const [customs] = useStorageItem(customProviders, []);
+  const canStartChat = useMemo(() => hasUsableModel(creds, customs), [creds, customs]);
+
+  // 新对话：seed 自全局「新对话默认种子」（= 用户上次切到的）。全局种子只是持久化
+  // 偏好、不驱动任何实时 UI（真正响应式的是上面的 turn 草稿），故这里直接异步读一次
+  // 即可，不用 useStorageItem 订阅——避免 watch 回调的多余重渲染 + 自写触发的 seed
+  // 空跑 + 双切闪烁竞态。代价：另一个窗口在新对话里切模型不会实时同步到本窗口的未
+  // 动过新对话（WYSIWYG，反而更可预期），种子仍正确写入不丢。
+  useEffect(() => {
+    if (!isNewChat) return;
+    let mounted = true;
+    Promise.all([lastSelectedModel.getValue(), thinkingLevelStorage.getValue()]).then(([m, l]) => {
+      if (!mounted) return;
+      setTurnModel(m);
+      setTurnThinking(l ?? 'medium');
+    });
+    return () => { mounted = false; };
+  }, [isNewChat]);
+
+  // 切模型 / 思考档：更新本地草稿 + 回写全局种子（供下一个新对话用，fire-and-forget）。
+  // 不在此落库到会话行——那是发送 / 重试时由 turn 随消息带给后台做的（carry-on-message）。
+  const handleModelChange = useCallback((m: ModelIdentity) => {
+    setTurnModel(m);
+    void lastSelectedModel.setValue(m);
+  }, []);
+  const handleThinkingChange = useCallback((l: ThinkingLevel) => {
+    setTurnThinking(l);
+    void thinkingLevelStorage.setValue(l);
+  }, []);
 
   // 句柄：欢迎页示例卡片通过它把 prompt 填入输入框。
   const inputRef = useRef<ChatInputHandle>(null);
@@ -76,7 +114,12 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     onSessionLoaded: useCallback((session: SessionRecord | null) => {
       if (!session) {
         navigate('/chat/new', { replace: true });
+        return;
       }
+      // 已有会话：本地草稿 seed 自会话行自己存的选择（而非全局）。模型 / provider
+      // 为空（旧会话 / 旧备份）时置 null，让发送门禄拦下来提示用户重选。
+      setTurnModel(session.provider && session.model ? { provider: session.provider, modelId: session.model } : null);
+      setTurnThinking((session.thinkingLevel as ThinkingLevel) || 'medium');
     }, [navigate]),
   });
 
@@ -139,14 +182,28 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
   // intent to see the latest output.
   const handleSend = useCallback(
     async (text: string, attachments: Attachment[] | undefined, expectedSessionId: string | null) => {
-      const result = await send(text, attachments, expectedSessionId);
+      // 切换到已有会话但其会话行尚未加载完（sessionLoading）时拒绝派发：此刻
+      // turnModel 还是上一个会话的本地草稿，若此时发送会把旧模型携带给新会话、
+      // 污染新会话行。等 onSessionLoaded 把 turnModel 重新 seed 后再放行。
+      if (!isNewChat && routeSessionId !== activeSessionId) {
+        return { status: 'notDispatched', reason: 'unavailable' } as const;
+      }
+      const result = await send(text, attachments, expectedSessionId, {
+        model: turnModel ?? undefined,
+        thinkingLevel: turnThinking,
+      });
       if (result.status === 'dispatched') {
         scrollToBottom({ force: true });
       }
       return result;
     },
-    [scrollToBottom, send],
+    [scrollToBottom, send, turnModel, turnThinking, isNewChat, routeSessionId, activeSessionId],
   );
+
+  // 重试同样携带本轮选中的模型 / 思考档，支持「换个模型再重试」。
+  const handleRetry = useCallback(() => {
+    retry({ model: turnModel ?? undefined, thinkingLevel: turnThinking });
+  }, [retry, turnModel, turnThinking]);
 
   const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
   // 压缩期间隐藏思考占位符，改由专门的压缩状态条提示，避免两个动效重叠。
@@ -154,7 +211,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
 
   // History of user-typed prompts in this session, oldest first; consumed by
   // ChatInput's ↑/↓ navigation. Strips the <user-request> wrapper added by
-  // buildStructuredMessage so what comes back is exactly what the user typed.
+  // composeUserMessage so what comes back is exactly what the user typed.
   const userHistory = useMemo(
     () => messages
       .filter((m): m is UserMessage => m.role === 'user')
@@ -285,7 +342,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
               // only when the turn has actually closed (no pending tool round),
               // and only when the agent is idle (no overlapping run).
               const canRetry = isLast && isTurnClosing && !isAgentRunning;
-              const onRetry = canRetry ? retry : undefined;
+              const onRetry = canRetry ? handleRetry : undefined;
 
               return (
                 <AgentMessage
@@ -449,7 +506,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
 
           {!sessionLoading && messages.length === 0 && !isAgentRunning && (
             <WelcomeScreen
-              hasModel={!!currentModel}
+              hasModel={canStartChat}
               onPickExample={(prompt) => inputRef.current?.fill(prompt)}
               onOpenSettings={() => onOpenSettings?.()}
             />
@@ -483,6 +540,10 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
         onOpenSettings={onOpenSettings}
         userHistory={userHistory}
         sessionId={isNewChat ? activeSessionId : routeSessionId ?? null}
+        model={turnModel}
+        thinkingLevel={turnThinking}
+        onModelChange={handleModelChange}
+        onThinkingChange={handleThinkingChange}
       />
     </>
   );

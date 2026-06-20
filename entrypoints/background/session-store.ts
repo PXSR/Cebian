@@ -6,6 +6,7 @@ import {
   getSession,
   listSessions,
   deleteSession,
+  updateSessionSettings,
   applySessionsTransactional,
   ThrottledSessionWriter,
   type SessionRecord,
@@ -34,6 +35,14 @@ class SessionStore {
   async delete(id: string): Promise<void> {
     await deleteSession(id);
     this.disposeWriter(id);
+  }
+
+  /** 把会话的模型 / 思考档落库（background 是 Dexie 唯一写者，故经由此处）。 */
+  async updateSettings(
+    id: string,
+    settings: { provider?: string; model?: string; thinkingLevel?: string },
+  ): Promise<void> {
+    await updateSessionSettings(id, settings);
   }
 
   scheduleWrite(id: string, messages: AgentMessage[]): void {

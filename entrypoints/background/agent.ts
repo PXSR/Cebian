@@ -1,9 +1,12 @@
 import { Agent, type AgentOptions, type AgentMessage, type AgentTool } from '@earendil-works/pi-agent-core';
 import type { Api, Model, Message } from '@earendil-works/pi-ai';
-import { providerCredentials, type OAuthCredential } from '@/lib/persistence/storage';
+import { providerCredentials, userInstructions as userInstructionsStorage, type OAuthCredential } from '@/lib/persistence/storage';
 import { getValidOAuthToken } from '@/lib/providers/oauth';
 import { DEFAULT_SYSTEM_PROMPT } from '@/lib/agent/system-prompt';
 import { isCompactionSummary } from '@/lib/agent/compaction';
+import { gatherPageContext } from '@/lib/agent/page-context';
+import { buildTextPrefix, type Attachment } from '@/lib/agent/attachments';
+import { scanSkillIndex, buildSkillsBlock } from '@/lib/ai-config/scanner';
 
 // ─── Provider credential resolution ───
 
@@ -36,25 +39,29 @@ export async function resolveProviderApiKey(
 // ─── System prompt builder ───
 
 /**
- * 构造 agent 的 systemPrompt：基础提示词（替换 `{{SESSION_ID}}`）+ 可选的
- * `<skills>`（skills 索引）段 + 可选的 `<user-instructions>` 段。作为
- * systemPrompt 拼接的单一真理来源，由 agent-manager 的 `composeSystemPrompt`
- * 在会话创建 / 切模型 / retry / 每轮派发前刷新时调用。
+ * 构造 agent 的 systemPrompt：基础提示词（按 `variables` 替换其中的 `{{KEY}}`
+ * 占位符）+ 可选的 `<skills>`（skills 索引）段 + 可选的 `<user-instructions>` 段。
+ * 作为 systemPrompt 拼接的单一真理来源，由同文件的 `composeSystemPrompt` 在会话
+ * 创建 / 切模型 / retry / 每轮派发前刷新时调用。
  *
- * 保持纯/同步：skills 与 instructions 的数据获取留在 agent-manager（它本就
- * import 了 scanner），本函数只负责拼接，不依赖 VFS / scanner。
+ * 保持纯/同步：变量值（如会话工作目录）、skills、instructions 的获取都留在
+ * `composeSystemPrompt`；本函数只负责拼接 + 文本替换，不认识具体变量名、不依赖
+ * VFS / scanner / session 等概念。
  *
  * skills 块置于 system 顶部（贴近 base prompt），随整个 system 落入缓存前缀——
  * skills 不变则逐字节一致、每轮命中缓存；skills 变则击穿一次（装/卸 skill 的
  * 实时性代价，低频可接受）。system 末尾只有一个缓存断点，skills 与 instructions
  * 谁先谁后不影响命中率，顺序仅取语义可读性。
  */
-export function buildSystemPrompt(
-  sessionId: string,
+function buildSystemPrompt(
   userInstructions: string,
   skillsBlock?: string,
+  variables: Record<string, string> = {},
 ): string {
-  const basePrompt = DEFAULT_SYSTEM_PROMPT.replaceAll('{{SESSION_ID}}', sessionId);
+  const basePrompt = DEFAULT_SYSTEM_PROMPT.replace(
+    /\{\{(\w+)\}\}/g,
+    (match, name: string) => (Object.hasOwn(variables, name) ? variables[name] : match),
+  );
   const parts: string[] = [basePrompt];
 
   const trimmedSkills = skillsBlock?.trim();
@@ -70,17 +77,74 @@ export function buildSystemPrompt(
   return parts.join('\n\n');
 }
 
+// ─── Context composers ───
+//
+// 「compose 层」：先读 async 上下文（page context / skills / instructions），再组装
+// 成发给 agent 的字符串。与纯拼接的 `buildSystemPrompt`（build 层）分工对照——
+// build* 给定零件拼字符串、纯同步；compose* 负责取数据再委托 build*。两者同处本文件，
+// 让分层在视觉上相邻。
+
+/**
+ * 组装本轮要发给 agent 的「结构化用户消息」：reminder 占位段 + 附件文本前缀 +
+ * `<context>`（日期 + 页面上下文）+ `<user-request>`（始终置末）。读 page context
+ * 是 async，故本函数 async。
+ */
+export async function composeUserMessage(text: string, attachments: Attachment[]): Promise<string> {
+  const parts: string[] = [];
+
+  // ① Tool/behavior reminders (placeholder)
+  parts.push('<reminder-instructions>\n</reminder-instructions>');
+
+  // ② Attachments (elements + files; images go via multimodal content blocks)
+  const attachmentBlock = buildTextPrefix(attachments);
+  if (attachmentBlock) parts.push(attachmentBlock);
+
+  // ③ Context: date + page state
+  const ctxLines: string[] = [];
+  ctxLines.push(`The current date is ${new Date().toLocaleDateString('en-CA')}.`);
+  const pageCtx = await gatherPageContext();
+  if (pageCtx) {
+    ctxLines.push('');
+    ctxLines.push(pageCtx);
+  }
+  parts.push(`<context>\n${ctxLines.join('\n')}\n</context>`);
+
+  // ④ User request (always last)
+  // TODO: user text is NOT sanitized — users are trusted; stripping structural tags would alter their intent.
+  parts.push(`<user-request>\n${text.trim()}\n</user-request>`);
+
+  return parts.join('\n\n');
+}
+
+/**
+ * 组装会话的 systemPrompt——systemPrompt 的单一来源。读取用户指令 + 扫描 skills
+ * 索引（命中缓存，开销≈ 0），交给纯函数 `buildSystemPrompt` 拼接。每轮派发前无
+ * 条件调用：skills 不变则产出逐字节相同的字符串、命中 system 缓存；skills 变则产
+ * 出变化、击穿缓存一次（= 装/卸 skill 的实时性代价）。因此无需写「skills 是否变
+ * 化」的 diff 逻辑。
+ */
+export async function composeSystemPrompt(sessionId: string): Promise<string> {
+  const [instructions, skillMetas] = await Promise.all([
+    userInstructionsStorage.getValue(),
+    scanSkillIndex(),
+  ]);
+  const skillsBlock = buildSkillsBlock(skillMetas);
+  // 「会话域 → 模板变量」的翻译层：本函数是唯一认识 session 概念、并把它映射成
+  // 纯装配器 buildSystemPrompt 所需的 `{{KEY}}` 变量表的地方。新增占位符只改这里。
+  return buildSystemPrompt(instructions || '', skillsBlock, { SESSION_ID: sessionId });
+}
+
 // ─── Agent factory ───
 
 export interface CreateAgentOptions {
   model: Model<Api>;
-  /** Session id — substituted into the system prompt as the agent's working directory. */
-  sessionId: string;
   /**
-   * Optional user-provided instructions appended to the built-in system prompt.
-   * Intended for style/language/role tweaks; cannot override tool protocol or safety rules.
+   * 完整成形的 systemPrompt（base + skills + user-instructions 已拼好）。由调用方
+   * 经同文件导出的 `composeSystemPrompt`（其内委托纯函数 `buildSystemPrompt`）
+   * 组装后传入——本工厂不再自行拼接，避免「先拼一版、马上被含 skills 的版本
+   * 覆盖」的双读双设。
    */
-  userInstructions: string;
+  systemPrompt: string;
   thinkingLevel: 'off' | 'minimal' | 'low' | 'medium' | 'high';
   messages?: AgentMessage[];
   /** Session-specific tools array (includes per-session ask_user). */
@@ -97,19 +161,16 @@ export interface CreateAgentOptions {
 export function createCebianAgent(options: CreateAgentOptions): Agent {
   const {
     model,
-    sessionId,
-    userInstructions,
+    systemPrompt,
     thinkingLevel,
     messages = [],
     tools: agentTools,
     beforeToolCall,
   } = options;
 
-  const effectivePrompt = buildSystemPrompt(sessionId, userInstructions);
-
   const agentOptions: AgentOptions = {
     initialState: {
-      systemPrompt: effectivePrompt,
+      systemPrompt,
       model,
       thinkingLevel,
       tools: agentTools,

@@ -1,4 +1,4 @@
-import { customProviders, providerCredentials, activeModel } from '@/lib/persistence/storage';
+import { customProviders, providerCredentials, lastSelectedModel } from '@/lib/persistence/storage';
 import { customProviderKey } from '@/lib/providers/custom-models';
 
 // ─── Dev-only storage seed ───
@@ -13,13 +13,13 @@ import { customProviderKey } from '@/lib/providers/custom-models';
 // Semantics: never overwrite user data.
 //   - If a provider with id `dev` already exists, the entire seed is
 //     skipped (the user may have edited it; we don't know).
-//   - `activeModel` is only set when nothing is currently active.
+//   - `lastSelectedModel` is only set when nothing is currently selected.
 //
 // The provider id is intentionally fixed (`dev`) rather than configurable:
 // keeping it stable means re-running `pnpm dev` doesn't accumulate stale
 // providers, and the "already exists" check has a single source of truth.
 //
-// Write order is also intentional: credentials → activeModel → provider.
+// Write order is also intentional: credentials → lastSelectedModel → provider.
 // The provider entry doubles as our "already seeded" flag, so we write it
 // LAST. Any crash mid-seed leaves the guard "unseeded" and the next launch
 // retries cleanly from scratch instead of leaving orphan state.
@@ -70,9 +70,9 @@ export async function seedDevStorage(): Promise<void> {
   });
 
   // Only auto-select if the user hasn't picked anything yet.
-  const currentActive = await activeModel.getValue();
+  const currentActive = await lastSelectedModel.getValue();
   if (!currentActive) {
-    await activeModel.setValue({ provider: CREDENTIALS_KEY, modelId });
+    await lastSelectedModel.setValue({ provider: CREDENTIALS_KEY, modelId });
   }
 
   // Provider entry is written LAST: it's the "seeded" flag the guard above checks.

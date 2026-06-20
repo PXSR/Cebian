@@ -7,7 +7,7 @@ import { CustomProviderForm, CustomProviderCard } from '@/components/settings/pr
 import { useStorageItem } from '@/hooks/useStorageItem';
 import {
   providerCredentials,
-  activeModel,
+  lastSelectedModel,
   customProviders,
   type ApiKeyCredential,
   type OAuthCredential,
@@ -27,7 +27,7 @@ import { t } from '@/lib/i18n';
  */
 export function ProvidersSection() {
   const [providers, setProviders] = useStorageItem(providerCredentials, {});
-  const [currentModel, setCurrentModel] = useStorageItem(activeModel, null);
+  const [currentModel, setCurrentModel] = useStorageItem(lastSelectedModel, null);
   const [customs, setCustoms] = useStorageItem(customProviders, []);
   const [oauthStates, setOAuthStates] = useState<Record<string, OAuthPhase>>({});
   const [apiKeysExpanded, setApiKeysExpanded] = useState(false);

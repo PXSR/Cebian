@@ -6,7 +6,7 @@ import {
   type CollectedStorage,
 } from '@/lib/backup/sources/storage';
 import {
-  activeModel,
+  lastSelectedModel,
   userInstructions,
   customProviders,
   mcpServers,
@@ -45,7 +45,7 @@ beforeEach(() => {
 
 describe('collectStorage', () => {
   it('settings 含非密钥项，且绝不含任何密钥', async () => {
-    await activeModel.setValue({ provider: 'openai', modelId: 'gpt' });
+    await lastSelectedModel.setValue({ provider: 'openai', modelId: 'gpt' });
     await userInstructions.setValue('hi');
     await mcpServers.setValue([bearerServer('s1', 'mcp-secret')]);
     await providerCredentials.setValue({ openai: { authType: 'apiKey', apiKey: 'sk-x', verified: true } });
@@ -90,7 +90,7 @@ describe('collectStorage', () => {
 describe('restoreStorage — replace', () => {
   it('settings 用备份覆盖；混合 item 用 secret 重组 token', async () => {
     // 本地是另一套值。
-    await activeModel.setValue({ provider: 'local', modelId: 'm' });
+    await lastSelectedModel.setValue({ provider: 'local', modelId: 'm' });
     await mcpServers.setValue([bearerServer('s1', 'local-token')]);
 
     const data: CollectedStorage = {
@@ -104,7 +104,7 @@ describe('restoreStorage — replace', () => {
     };
     await restoreStorage(data, { strategy: 'replace', settings: true, credentials: true });
 
-    expect(await activeModel.getValue()).toEqual({ provider: 'backup', modelId: 'b' });
+    expect(await lastSelectedModel.getValue()).toEqual({ provider: 'backup', modelId: 'b' });
     const servers = await mcpServers.getValue();
     expect(servers[0].auth).toEqual({ type: 'bearer', token: 'backup-token' });
   });
@@ -212,12 +212,12 @@ describe('restoreStorage — 混合 item 的密钥单独随 credentials 恢复',
 
 describe('restoreStorage — merge', () => {
   it('标量设置（无 fillMissing）merge 下保留本地、不写', async () => {
-    await activeModel.setValue({ provider: 'local', modelId: 'm' });
+    await lastSelectedModel.setValue({ provider: 'local', modelId: 'm' });
     const data: CollectedStorage = {
       config: { [SK.activeModel]: { provider: 'backup', modelId: 'b' } },
     };
     await restoreStorage(data, { strategy: 'merge', settings: true, credentials: false });
-    expect(await activeModel.getValue()).toEqual({ provider: 'local', modelId: 'm' });
+    expect(await lastSelectedModel.getValue()).toEqual({ provider: 'local', modelId: 'm' });
   });
 
   it('customProviders 按 id 补缺：本地已有保留、本地缺的从备份补入', async () => {

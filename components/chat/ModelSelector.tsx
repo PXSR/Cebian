@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { getModels, type KnownProvider, type Api, type Model } from '@earendil-works/pi-ai';
 import { Check, ChevronDown, Settings } from 'lucide-react';
 
-import type { ActiveModel, ProviderCredentials, CustomProviderConfig } from '@/lib/persistence/storage';
-import { isCustomProvider, findCustomProvider, getCustomModels, customProviderKey } from '@/lib/providers/custom-models';
+import type { ModelIdentity, ProviderCredentials, CustomProviderConfig } from '@/lib/persistence/storage';
+import { isCustomProvider, findCustomProvider } from '@/lib/providers/custom-models';
+import { listUsableModelGroups } from '@/lib/providers/usable-models';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,7 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { t } from '@/lib/i18n';
 
 interface ModelSelectorProps {
-  activeModel: ActiveModel | null;
+  activeModel: ModelIdentity | null;
   configuredProviders: ProviderCredentials;
   customProviders: CustomProviderConfig[];
   onSelect: (provider: string, modelId: string) => void;
@@ -36,52 +37,10 @@ export function ModelSelector({
   const [open, setOpen] = useState(false);
   const [commandValue, setCommandValue] = useState('');
 
-  const providerModels = useMemo(() => {
-    const groups: { provider: string; label: string; models: Model<Api>[] }[] = [];
-    const seen = new Set<string>();
-
-    // 自定义 provider：直接来自 customProviders 列表，不依赖是否配置/验证了
-    // API key（key 是可选的，未配置也应该可见可选。这是 issue #3 的修复）。
-    for (const config of customProviders) {
-      const providerKey = customProviderKey(config.id);
-      const models = getCustomModels(config);
-      if (models.length > 0) {
-        groups.push({ provider: providerKey, label: config.name, models });
-        seen.add(providerKey);
-      }
-    }
-
-    // 内置 pi-ai provider 的门控按认证类型区分：
-    // - API key：填了 key 就可选（连通性测试失败也保存，见 issue #10），
-    //   verified 只代表「测试通过过」，不应作为可用门槛；
-    // - OAuth：仍要求已登录（verified）。
-    for (const [provider, cred] of Object.entries(configuredProviders)) {
-      const usable = cred.authType === 'apiKey' ? !!cred.apiKey : cred.verified;
-      if (!usable) continue;
-      // 自定义的已在上面处理
-      if (isCustomProvider(provider)) continue;
-      if (seen.has(provider)) continue;
-      try {
-        const models = getModels(provider as KnownProvider) as Model<Api>[];
-        if (models.length > 0) {
-          groups.push({ provider, label: provider, models });
-        }
-      } catch {
-        // Unknown provider, skip
-      }
-    }
-
-    return groups;
-  }, [configuredProviders, customProviders]);
-
-  // Auto-select first available model when none is selected
-  useEffect(() => {
-    if (activeModel) return;
-    const first = providerModels[0];
-    if (first?.models.length > 0) {
-      onSelect(first.provider, first.models[0].id);
-    }
-  }, [activeModel, providerModels, onSelect]);
+  const providerModels = useMemo(
+    () => listUsableModelGroups(configuredProviders, customProviders),
+    [configuredProviders, customProviders],
+  );
 
   const activeModelName = useMemo(() => {
     if (!activeModel) return null;

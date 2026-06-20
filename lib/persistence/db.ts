@@ -121,6 +121,26 @@ export async function updateSessionTitle(id: string, title: string): Promise<voi
   await db.sessions.update(id, { title, updatedAt: Date.now() });
 }
 
+/**
+ * 更新会话的模型 / 思考档。这是「每个对话各记一个模型」的落库点——用户在某会话切换
+ * 模型并发送时，后台据此把选择写进该会话行（运行时再从会话行回读，不再读全局）。
+ * 只补传入的字段，未传字段保持原值；全空 patch 不动 updatedAt（避免无谓把会话顶到
+ * 历史列表前面，它按 updatedAt 排序）。`provider` 是 provider key（含 custom: 前缀），
+ * `model` 是 modelId，与建行时的快照字段同形。
+ */
+export async function updateSessionSettings(
+  id: string,
+  settings: { provider?: string; model?: string; thinkingLevel?: string },
+): Promise<void> {
+  const patch: Partial<SessionRecord> = {};
+  if (settings.provider !== undefined) patch.provider = settings.provider;
+  if (settings.model !== undefined) patch.model = settings.model;
+  if (settings.thinkingLevel !== undefined) patch.thinkingLevel = settings.thinkingLevel;
+  if (Object.keys(patch).length === 0) return;
+  patch.updatedAt = Date.now();
+  await db.sessions.update(id, patch);
+}
+
 export async function deleteSession(id: string): Promise<void> {
   await db.sessions.delete(id);
 }
