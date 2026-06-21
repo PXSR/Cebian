@@ -4,7 +4,8 @@
 import type { ReactElement, ReactNode, SVGProps } from 'react';
 import { t } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
-import { useUpdateCheck, getInstallGuideUrl } from '@/hooks/useUpdateCheck';
+import { useUpdateCheck } from '@/hooks/useUpdateCheck';
+import { getInstallGuideUrl } from '@/lib/site-links';
 
 type SocialKey = 'wechat' | 'bilibili' | 'xiaohongshu' | 'x';
 

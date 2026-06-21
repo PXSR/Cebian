@@ -140,17 +140,3 @@ export function useUpdateCheck() {
   return { status, current, recheck };
 }
 
-/**
- * Resolves the install-guide URL on cebian.catcat.work based on the current
- * UI language. Chinese locales (zh, zh_CN, zh_TW, zh_HK) all map to /zh;
- * everything else falls back to /en.
- *
- * TODO: add a /zh-tw path once the install guide site ships a Traditional
- * Chinese variant — currently zh_TW users get the Simplified guide.
- */
-export function getInstallGuideUrl(): string {
-  const lang = chrome.i18n.getUILanguage().toLowerCase();
-  const path = lang.startsWith('zh') ? '/zh/install-guide' : '/en/install-guide';
-  return `https://cebian.catcat.work${path}`;
-}
-

@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## 1.3.3 - 2026-06-21
+
 ### 新增 / Added
 
 - 对话输入框支持语音输入：点击麦克风按钮即可把语音实时转写进输入框，离线本地识别（基于浏览器 on-device 语音引擎，音频不离开设备），首次使用会自动下载所选语言的语音模型 (#20)
@@ -25,12 +27,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 每个对话各自记住自己的模型与思考档：在某个对话里切换模型/思考档只影响该对话，新对话沿用你上一次选择的模型作为默认；适合多开标签分散使用、按对话把请求分摊到不同供应商 (#11)
 - 使用 OpenRouter 时，请求会附带应用标识请求头（`HTTP-Referer` / `X-Title`），让 Cebian 出现在 OpenRouter 的应用榜单中；不含任何用户数据，仅对 OpenRouter 发送
 - WebDAV 备份新增「断开连接」：可移除已保存的连接配置（含密码），远程已上传的快照会保留，重新连接后仍可访问
+- 扩展升级后，下次打开侧边栏会自动打开更新日志页并定位到新版本，方便查看本次更新内容
 
 - Voice input in the chat composer: click the mic button to transcribe speech into the input in real time, recognized locally on-device (the browser's on-device speech engine — audio never leaves your device); the language model for your locale is downloaded automatically on first use (#20)
 - Added a generic permission page to grant microphone access from a tab (the side panel can't show the prompt directly)
 - Each conversation now remembers its own model and thinking level: switching the model/thinking level inside one chat affects only that chat, and a new chat defaults to the model you last picked; handy for spreading work across multiple tabs and routing requests to different providers per conversation (#11)
 - When using OpenRouter, requests now carry app-identifying headers (`HTTP-Referer` / `X-Title`) so Cebian appears on OpenRouter's app rankings; they contain no user data and are sent to OpenRouter only
 - WebDAV backup can now be disconnected: remove the saved connection (including the password); snapshots already uploaded to the server are kept and stay accessible after reconnecting
+- After an extension upgrade, opening the side panel next time automatically opens the changelog page scrolled to the new version, so you can see what changed
 
 ### 修复 / Fixed
 
@@ -40,6 +44,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 询问用户/权限确认卡片的文本现在保留换行，多行时图标与首行对齐 (#23)
 - 文件编辑页窄屏布局下，右键删除文件时不再误把该文件重新打开 (#22)
 - 修复 AI 偶尔不读取页面、凭记忆编造链接就跳转的问题：现在要求链接地址必须来自页面真实 \`href\`、用户输入或工具结果，仅允许基于页面上可见样本的推导（如可见的 \`?page=2\` 翻到 \`?page=3\`），并在跳转失败时回退到重新读取页面
+- 修复「关于」页与更新提示里的安装指南链接指向失效旧地址的问题（现指向重构后的文档站安装页），并按界面语言正确区分简体 / 繁体 / 英文
 
 - Use the user-provided name for backup filenames
 - Avoid the 64 MiB runtime message limit on session backup and restore
@@ -47,6 +52,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Preserve line breaks in ask-user and permission-prompt card text, and align the icon to the first line for multi-line text (#23)
 - Fixed the AI occasionally navigating to a URL invented from memory instead of reading the page: link addresses must now come from a real page \`href\`, user input, or a tool result, with derivation allowed only from a sample visible on the page (e.g. bumping a visible \`?page=2\` to \`?page=3\`), and a fallback to re-read the page when navigation fails
 - File editor: deleting a file from the right-click menu no longer spuriously reopens it in the compact (narrow) layout (#22)
+- Fixed the install-guide link in the About page and update notice pointing at a dead old URL (now points at the rebuilt docs site's installation page), and route it to the correct Simplified / Traditional Chinese / English variant per UI language
 
 ### 变更 / Changed
 

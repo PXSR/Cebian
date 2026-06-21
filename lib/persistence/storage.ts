@@ -169,6 +169,17 @@ export const updateNoticeState = storage.defineItem<UpdateNoticeState>(
   { fallback: { skippedVersion: null, lastPromptedAt: 0 } },
 );
 
+/**
+ * 扩展刚更新到的版本号，待侧边栏下次打开时消费：背景 SW 在
+ * `chrome.runtime.onInstalled`（reason=update）时写入当前版本，侧边栏启动后读取
+ * 并打开对应版本的更新日志页，随即清空。`null` 表示无待展示更新。
+ * 之所以经持久标记而非更新时直接开标签，是为了保证只在用户主动打开侧边栏后才弹页。
+ */
+export const pendingChangelogVersion = storage.defineItem<string | null>(
+  'local:pendingChangelogVersion',
+  { fallback: null },
+);
+
 // ─── WebDAV 备份连接配置 ───
 
 /**

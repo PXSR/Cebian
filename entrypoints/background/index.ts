@@ -9,6 +9,7 @@ import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage } from '@/lib/i
 import { isRecorderRuntimeMessage, RECORDER_MSG_KIND, type RecorderControlMessage } from '@/lib/recorder/protocol';
 import { isInjectablePage } from '@/lib/browser/tab-actions';
 import { vfs } from '@/lib/persistence/vfs';
+import { pendingChangelogVersion } from '@/lib/persistence/storage';
 import { isValidSessionId } from '@/lib/utils';
 
 /**
@@ -30,6 +31,18 @@ export default defineBackground(() => {
     .catch((error) => console.error(error));
 
   setupOAuthRefresh();
+
+  // 扩展升级后记下新版本号，供侧边栏下次打开时弹出更新日志（不在此直接
+  // 开标签，避免商店版后台静默更新时在用户未授意下弹页）。`previousVersion`
+  // 等于当前版时跳过，挡掉 dev 热重载触发的同版本 onInstalled。
+  chrome.runtime.onInstalled.addListener(({ reason, previousVersion }) => {
+    if (reason !== 'update') return;
+    const current = chrome.runtime.getManifest().version;
+    if (previousVersion === current) return;
+    void pendingChangelogVersion.setValue(current).catch((err) =>
+      console.warn('[onInstalled] failed to record changelog version:', err),
+    );
+  });
 
   // 注册备份 IPC 响应器（会话采集 / 写回；Dexie 唯一写者经此转发）。
   registerBackupHandler();

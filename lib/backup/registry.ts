@@ -19,6 +19,7 @@ import {
   settingsFilePanelWidth,
   lastSettingsSection,
   updateNoticeState,
+  pendingChangelogVersion,
   type MCPServerConfig,
   type ProviderCredentials,
   type WebDavConfig,
@@ -248,6 +249,7 @@ export const BACKUP_REGISTRY: BackupEntry<any>[] = [
   entry({ item: settingsFilePanelWidth, storageClass: 'exclude' }),
   entry({ item: lastSettingsSection, storageClass: 'exclude' }),
   entry({ item: updateNoticeState, storageClass: 'exclude' }),
+  entry({ item: pendingChangelogVersion, storageClass: 'exclude' }),
 ];
 
 /** BACKUP_REGISTRY 中所有已登记的 storage key 集合（供覆盖性测试比对）。 */

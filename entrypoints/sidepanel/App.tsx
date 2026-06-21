@@ -8,6 +8,7 @@ import { UpdateNoticeOutlet } from '@/components/dialogs/update-notice-outlet';
 import { Header } from '@/components/layout/Header';
 import { HistoryPanel } from '@/components/layout/HistoryPanel';
 import { useStorageItem } from '@/hooks/useStorageItem';
+import { useChangelogOnUpdate } from '@/hooks/useChangelogOnUpdate';
 import { themePreference } from '@/lib/persistence/storage';
 import { ChatPage } from './pages/chat';
 
@@ -37,6 +38,9 @@ function App() {
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  // 侧边栏打开后，若后台在升级时留了「待展示更新日志」标记，则打开更新日志页。
+  useChangelogOnUpdate();
 
   // Load theme from storage before first render
   useEffect(() => {

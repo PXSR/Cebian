@@ -8,7 +8,8 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { useUpdateCheck, getInstallGuideUrl } from '@/hooks/useUpdateCheck';
+import { useUpdateCheck } from '@/hooks/useUpdateCheck';
+import { getInstallGuideUrl } from '@/lib/site-links';
 import { updateNoticeState } from '@/lib/persistence/storage';
 import { t } from '@/lib/i18n';
 
