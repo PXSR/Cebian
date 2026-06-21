@@ -59,8 +59,11 @@ const t = getDict(lang);
 
     const win = window as unknown as { dataLayer?: IArguments[] };
     win.dataLayer = win.dataLayer || [];
-    // 与 BaseHead 的 gtag stub 一致：push 真正的 arguments 对象，gtag.js 才能识别。
-    function gtag() { win.dataLayer!.push(arguments); }
+    // 与 BaseHead 的 gtag stub 一致：必须 push 真正的 arguments 对象（不是数组），
+    // gtag.js 才能识别 consent 命令。参数显式声明以满足类型检查。
+    function gtag(_command: string, _action: string, _params: Record<string, string>) {
+      win.dataLayer!.push(arguments);
+    }
     const decide = (granted: boolean) => {
       try { localStorage.setItem(KEY, granted ? 'granted' : 'denied'); } catch {}
       gtag('consent', 'update', { analytics_storage: granted ? 'granted' : 'denied' });

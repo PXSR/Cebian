@@ -32,7 +32,7 @@ const flip = index % 2 === 1;
     {video
       ? (
         <div class="feature-vid-wrap">
-          <video class="feature-vid" src={video} muted loop playsinline preload="none" fetchpriority="low" aria-label={feature.shotLabel}></video>
+          <video class="feature-vid" src={video} muted loop playsinline preload="none" aria-label={feature.shotLabel}></video>
           <button type="button" class="vid-toggle" data-playing="true" data-pause={pauseLabel} data-play={playLabel} aria-label={pauseLabel}>
             <svg class="ic-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
             <svg class="ic-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
@@ -106,6 +106,9 @@ const flip = index % 2 === 1;
     const video = wrap.querySelector<HTMLVideoElement>('.feature-vid');
     const btn = wrap.querySelector<HTMLButtonElement>('.vid-toggle');
     if (!video || !btn) continue;
+
+    // 进一步降低视频拉流优先级（fetchpriority 暂不在 Astro 的 video 类型里，故用 JS 设）。
+    video.setAttribute('fetchpriority', 'low');
 
     // 用户是否手动暂停过：手动暂停后，滚动不再自动恢复播放。
     let userPaused = reduce;
