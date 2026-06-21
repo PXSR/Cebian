@@ -49,6 +49,8 @@ export interface Dict {
     hero: {
       titleLead: string;
       titleAccent: string;
+      /** 高亮词之后的尾部文字（高亮词位于句中时使用，如英文）。结尾即高亮的语言可省略。 */
+      titleTrail?: string;
       ctaInstall: string;
       ctaDocs: string;
       heroShotLabel: string;

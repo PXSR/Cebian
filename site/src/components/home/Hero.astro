@@ -12,7 +12,7 @@ const h = t.home.hero;
   <div class="hero-glow" aria-hidden="true"></div>
   <div class="wrap hero-inner">
     <div class="hero-text reveal">
-      <h1>{h.titleLead} <span class="accent">{h.titleAccent}</span></h1>
+      <h1>{h.titleLead} <span class="accent">{h.titleAccent}</span>{h.titleTrail ? ` ${h.titleTrail}` : ''}</h1>
       <p class="hero-sub">{t.site.description}</p>
       <div class="hero-cta">
         <a class="btn btn-primary" href="#install">

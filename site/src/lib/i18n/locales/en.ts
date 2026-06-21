@@ -43,8 +43,9 @@ export const en: Dict = {
   },
   home: {
     hero: {
-      titleLead: 'An AI Agent that runs in your',
-      titleAccent: 'browser sidebar',
+      titleLead: 'An',
+      titleAccent: 'AI Agent',
+      titleTrail: 'that runs in your browser sidebar',
       ctaInstall: 'Add to browser',
       ctaDocs: 'Read the docs',
       heroShotLabel: 'A browser window with the Cebian sidebar docked',
