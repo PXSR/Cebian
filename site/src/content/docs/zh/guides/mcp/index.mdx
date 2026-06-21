@@ -1,0 +1,82 @@
+---
+title: MCP 工具
+description: 通过 HTTP 把外部工具接进 Cebian。
+group: guides
+order: 5
+---
+
+import Placeholder from '@/components/Placeholder.astro';
+import QA from '@/components/docs/QA.astro';
+import QAItem from '@/components/docs/QAItem.astro';
+import StatusLegend from '@/components/docs/StatusLegend.astro';
+
+MCP 用来把外部工具接进 Cebian。配置好 MCP 服务器后，服务器提供的工具会出现在 Agent 的工具列表里，模型可以在对话中按需调用。
+
+它适合接数据库、内部系统、文件服务、业务 API，或者任何已经封装成 MCP server 的工具。
+
+![截图](./snapshot.png)
+
+## 添加 MCP 服务器
+
+入口在「设置 → MCP 服务器」。
+
+点击「添加 MCP 服务器」后，需要填写：
+
+- 名称：方便你在列表里区分，比如 `github`、`weather`、`my-tools`
+- 传输协议：`streamable-http` 或 `sse`
+- URL：MCP server 的 HTTP 地址
+- 认证方式：无，或者 Bearer Token
+- 自定义 Headers：需要额外请求头时再填
+
+保存后，Cebian 会在后台连接服务器并读取它提供的工具。
+
+## 传输协议选择
+
+如果你的 MCP server 支持 `streamable-http`，优先选择它。
+
+`sse` 主要用于兼容一些旧服务。两者都需要是 HTTP 或 HTTPS 地址，不能填写本地文件路径或其它协议。
+
+## 对话中使用
+
+配置并启用服务器后，你不需要手动复制工具名。
+
+当你的问题需要外部工具时，Agent 会自己判断是否调用 MCP 工具。比如你接入了一个查询天气的 server，就可以直接问：
+
+```md
+帮我查一下明天上海的天气。
+```
+
+如果 server 提供了带界面的 MCP App，工具结果里还可能出现一个内嵌交互视图。这个视图由对应 server 提供，Cebian 负责把它显示在对话里。
+
+## 状态标识
+
+每个 MCP server 左侧会有一个小圆点，用不同颜色标识当前状态：
+
+<StatusLegend
+	items={[
+		{ color: 'blue', label: '等待首次调用', text: '已经保存，但还没真正用过' },
+		{ color: 'green', label: '已连接', text: '当前连接正常' },
+		{ color: 'sky', label: '未连接', text: '下一次调用时会重新连接' },
+		{ color: 'yellow', label: '重连中', text: '正在尝试恢复连接' },
+		{ color: 'red', label: '暂时不可用', text: '连续失败后会短暂熔断，稍后再试' },
+		{ color: 'gray', label: '已禁用', text: '这个 server 不会出现在 Agent 的工具列表里' },
+	]}
+/>
+
+如果某个服务暂时用不上，可以先把它禁用，不需要删除配置。
+
+## 认证与 Headers
+
+如果服务器需要 Bearer Token，就在「认证方式」里选择 Bearer Token 并填入 token。
+
+如果服务器需要其它请求头，可以在「自定义 Headers」里添加。注意：使用 Bearer Token 时，不要再手动添加 `Authorization` header，Cebian 会自动处理。
+
+## Q&A
+
+<QA>
+	<QAItem q="工具没有被调用怎么办？">先确认 server 已启用，并且你的问题确实需要这个工具。</QAItem>
+	<QAItem q="状态一直不可用怎么办？">检查 URL、网络、token 和 server 日志。</QAItem>
+	<QAItem q="添加时报 URL 无效怎么办？">URL 必须以 <code>http://</code> 或 <code>https://</code> 开头。</QAItem>
+	<QAItem q="不确定协议选哪个？">优先试 <code>streamable-http</code>。</QAItem>
+	<QAItem q="担心配置丢失怎么办？">备份时选择「普通设置」和「密钥信息」，MCP 配置和 token 会一起备份。</QAItem>
+</QA>

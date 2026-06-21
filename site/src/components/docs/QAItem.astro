@@ -1,0 +1,53 @@
+---
+interface Props {
+  q: string;
+}
+
+const { q } = Astro.props;
+---
+<article class="qa-item">
+  <p class="qa-q"><span class="qa-label">Q:</span>{q}</p>
+  <div class="qa-a">
+    <span class="qa-label">A:</span>
+    <div class="qa-body"><slot /></div>
+  </div>
+</article>
+
+<style>
+  .qa-item {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--surface) 72%, var(--surface-2));
+    overflow: hidden;
+  }
+  .qa-q {
+    margin: 0;
+    padding: 10px 13px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .qa-a {
+    display: flex;
+    gap: 0.5em;
+    margin: 0;
+    padding: 10px 13px;
+    color: var(--ink-muted);
+    border-top: 1px solid var(--line);
+    background: var(--surface-2);
+  }
+  .qa-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.75em;
+    font-family: var(--font-mono);
+    font-size: 0.78em;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0;
+  }
+  .qa-body { flex: 1; min-width: 0; }
+  .qa-body :global(p) { margin: 0; }
+  .qa-body :global(:first-child) { margin-top: 0; }
+  .qa-body :global(:last-child) { margin-bottom: 0; }
+</style>

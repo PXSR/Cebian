@@ -1,0 +1,20 @@
+---
+// 图片 / 视频占位槽。锁定宽高比，居中显示尺寸标注。
+// 之后替换为 <img> / <video>（Ken Burns）时，外层框样式不变，只换内容。
+interface Props {
+  /** 标注尺寸，如 "1040 × 720" */
+  dim: string;
+  /** 一行说明该处放什么 */
+  label: string;
+  /** CSS aspect-ratio，如 "16 / 10" */
+  ratio?: string;
+  class?: string;
+}
+const { dim, label, ratio = '16 / 10', class: className } = Astro.props;
+---
+<div class:list={['ph', className]} style={`aspect-ratio: ${ratio};`} role="img" aria-label={label}>
+  <div>
+    <div class="ph-dim mono">{dim}</div>
+    <div class="ph-label">{label}</div>
+  </div>
+</div>

@@ -1,0 +1,61 @@
+---
+const icons = {
+  camera: [
+    ['path', { d: 'M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z' }],
+    ['circle', { cx: '12', cy: '13', r: '3' }],
+  ],
+  'circle-dot': [
+    ['circle', { cx: '12', cy: '12', r: '10' }],
+    ['circle', { cx: '12', cy: '12', r: '1' }],
+  ],
+  mic: [
+    ['path', { d: 'M12 19v3' }],
+    ['path', { d: 'M19 10v2a7 7 0 0 1-14 0v-2' }],
+    ['rect', { x: '9', y: '2', width: '6', height: '13', rx: '3' }],
+  ],
+  'mouse-pointer-2': [
+    ['path', { d: 'M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z' }],
+  ],
+  paperclip: [
+    ['path', { d: 'm16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551' }],
+  ],
+  smartphone: [
+    ['rect', { width: '14', height: '20', x: '5', y: '2', rx: '2', ry: '2' }],
+    ['path', { d: 'M12 18h.01' }],
+  ],
+} as const;
+
+interface Props {
+  name: keyof typeof icons;
+}
+
+const { name } = Astro.props;
+const icon = icons[name];
+---
+<svg
+  class="lucide-doc-icon"
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  aria-hidden="true"
+>
+  {icon.map(([tag, attrs]) => {
+    const IconPart = tag;
+    return <IconPart {...attrs} />;
+  })}
+</svg>
+
+<style>
+  .lucide-doc-icon {
+    display: inline-block;
+    width: 0.95em;
+    height: 0.95em;
+    margin-right: 0.28em;
+    color: var(--accent);
+    vertical-align: -0.12em;
+  }
+</style>

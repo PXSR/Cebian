@@ -1,0 +1,76 @@
+---
+import type { ChangelogRelease } from '../../lib/changelog';
+
+interface Props {
+  release: ChangelogRelease;
+  /** 未发布版的标题文案（如「开发中」/ "In development"） */
+  unreleasedLabel: string;
+}
+
+const { release: r, unreleasedLabel } = Astro.props;
+// 锚点用版本号，未发布版固定为 unreleased，供 ?v= 深链定位。
+const anchor = r.unreleased ? 'unreleased' : r.version;
+---
+<article class:list={['rel', { unreleased: r.unreleased }]} id={`v-${anchor}`} data-version={anchor}>
+  <div class="rel-meta">
+    <h2 class="rel-ver">{r.unreleased ? unreleasedLabel : r.version}</h2>
+    {!r.unreleased && r.date && <time class="rel-date mono" datetime={r.date}>{r.date}</time>}
+  </div>
+
+  <div class="rel-body">
+    {r.sections.map((s) => (
+      <div class:list={['grp', `grp-${s.kind}`]}>
+        <h3><span class="pip" aria-hidden="true"></span>{s.label}</h3>
+        <ul>
+          {s.entries.map((e) => <li set:html={e.html} />)}
+        </ul>
+      </div>
+    ))}
+  </div>
+</article>
+
+<style>
+  .rel { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 28px; padding-block: 36px; border-top: 1px solid var(--line); scroll-margin-top: 90px; }
+
+  .rel-meta { position: sticky; top: 78px; align-self: start; }
+  .rel-ver { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; color: var(--ink); }
+  .rel.unreleased .rel-ver { color: var(--accent); }
+  .rel-date { display: block; margin-top: 6px; font-size: 13px; color: var(--ink-subtle); }
+
+  .grp + .grp { margin-top: 24px; }
+  .grp h3 { display: inline-flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 700; letter-spacing: 0.02em; }
+  .grp .pip { width: 8px; height: 8px; border-radius: 2px; background: var(--ink-subtle); }
+  .grp-added h3 { color: #2c8a52; } .grp-added .pip { background: #2c8a52; }
+  .grp-changed h3 { color: var(--accent-strong); } .grp-changed .pip { background: var(--accent-fill); }
+  .grp-fixed h3 { color: #b5551f; } .grp-fixed .pip { background: #b5551f; }
+  .grp-removed h3 { color: var(--ink-muted); } .grp-removed .pip { background: var(--ink-muted); }
+  .grp-breaking h3 { color: #c0392b; } .grp-breaking .pip { background: #c0392b; }
+
+  .grp ul { list-style: none; margin-top: 12px; display: flex; flex-direction: column; gap: 9px; }
+  .grp li { position: relative; padding-left: 18px; font-size: 15px; line-height: 1.6; color: var(--ink); }
+  .grp li::before { content: ""; position: absolute; left: 3px; top: 10px; width: 5px; height: 5px; border-radius: 50%; background: var(--line-2); }
+  .grp li :global(code) { font-family: var(--font-mono); font-size: 0.86em; background: var(--surface-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; color: var(--accent); }
+  .grp li :global(.cl-ref) { font-family: var(--font-mono); font-size: 0.86em; color: var(--accent); font-weight: 600; }
+  .grp li :global(.cl-ref:hover) { text-decoration: underline; }
+
+  [data-theme="dark"] .grp-added h3, [data-theme="dark"] .grp-added .pip { color: #4cc585; }
+  [data-theme="dark"] .grp-added .pip { background: #4cc585; }
+  [data-theme="dark"] .grp-fixed h3, [data-theme="dark"] .grp-fixed .pip { color: #e08a4f; }
+  [data-theme="dark"] .grp-fixed .pip { background: #e08a4f; }
+
+  /* ?v= 深链命中时的短暂高亮 */
+  .rel.is-target { animation: rel-flash 2s var(--ease); }
+  @keyframes rel-flash {
+    0%, 30% { background: var(--accent-wash); }
+    100% { background: transparent; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rel.is-target { animation: none; }
+  }
+
+  @media (max-width: 680px) {
+    .rel { grid-template-columns: 1fr; gap: 16px; padding-block: 28px; }
+    .rel-meta { position: static; display: flex; align-items: baseline; gap: 12px; }
+    .rel-date { margin-top: 0; }
+  }
+</style>

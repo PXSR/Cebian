@@ -1,0 +1,59 @@
+---
+title: Provider 列表
+description: Cebian 支持的模型提供商一览。
+group: reference
+order: 1
+---
+
+Cebian 本身不提供模型额度。你需要在「设置 → AI 提供商」里接入自己已有的订阅或 API Key，然后在对话输入框里选择模型。
+
+下面只是当前内置 Provider 的列表。实际可用模型会随各家服务变化，以设置页里能选到的模型为准。
+
+## OAuth
+
+这类 Provider 不需要手动填写 API Key，按页面提示登录即可。
+
+| Provider | 说明 |
+| --- | --- |
+| GitHub Copilot | 使用 Copilot 订阅访问模型 |
+| OpenAI Codex | 使用 ChatGPT Plus / Pro 订阅 |
+
+## API Key
+
+这类 Provider 需要填写对应平台的 API Key。保存时 Cebian 会做一次简单连通性测试；如果测试没通过，也会先保存，只是会显示「未验证」。
+
+- Ant Ling
+- Anthropic
+- Cerebras
+- DeepSeek
+- Fireworks
+- Google Gemini
+- Groq
+- Hugging Face
+- Kimi Coding Plan
+- MiniMax
+- MiniMax (CN)
+- Mistral
+- Moonshot
+- Moonshot (CN)
+- NVIDIA NIM
+- OpenAI
+- OpenRouter
+- Together AI
+- Vercel AI Gateway
+- xAI
+- Xiaomi MiMo
+- Xiaomi MiMo Plan (CN)
+- zAI
+
+## OpenAI Compatible
+
+如果你使用的是 OpenAI 兼容接口，也可以自己添加 Provider。
+
+常见场景包括：
+
+- 本地运行的 Ollama / LM Studio
+- 自己部署的 vLLM、LiteLLM 或网关服务
+- 公司内部的 OpenAI 兼容接口
+
+添加时填入名称、Base URL、API Key（如需要），再添加或自动获取模型列表即可。

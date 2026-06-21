@@ -1,0 +1,65 @@
+---
+title: VFS 文件系统
+description: Cebian 的浏览器内虚拟文件系统。
+group: guides
+order: 6
+---
+
+import Placeholder from '@/components/Placeholder.astro';
+import QA from '@/components/docs/QA.astro';
+import QAItem from '@/components/docs/QAItem.astro';
+
+VFS 是 Cebian 放在浏览器里的虚拟文件系统。它不是你电脑上的真实目录，`/workspaces/`、`~/.cebian/skills/` 这些路径也不会出现在 Finder 或资源管理器里。
+
+你可以把它理解成 Cebian 自己的一块本地文件区：模型生成的文件、Prompt、Skill、会话工作区里的资料，都会放在这里。
+
+<Placeholder
+	dim="1200 × 760"
+	ratio="16 / 10"
+	label="VFS 浏览器界面"
+/>
+
+## 存储内容
+
+VFS 里主要有几类目录：
+
+- `/workspaces/{sessionId}/`：每个对话自己的工作区。Cebian 在对话里生成报告、表格、图片等文件时，一般会放在这里。
+- `~/.cebian/prompts/`：Slash Prompt 的提示词文件。
+- `~/.cebian/skills/`：Skill 文件夹，每个 Skill 通常是一整个目录。
+- `~`：等同于 `/home/user`，只是一个虚拟的用户目录。
+
+普通使用时，你不需要记住这些路径。只有在查看 Cebian 生成的文件、整理 Prompt / Skill，或者排查文件链接时，才会接触到它们。
+
+## 运行机制
+
+VFS 存在浏览器扩展自己的 IndexedDB 里。也就是说：
+
+- 数据保存在本机浏览器里，不会因为 Cebian 有 VFS 就上传到服务器。
+- 它和你的真实磁盘隔离，模型不能直接读写你电脑上的任意文件。
+- 卸载扩展、清理浏览器扩展数据时，里面的文件也可能一起被删掉。
+
+Cebian 的文件工具读写的就是这套 VFS。比如模型帮你生成一个 Markdown 报告，实际就是在 VFS 里创建一个 `.md` 文件，然后在对话里给你一个可点击链接。
+
+## 打开方式
+
+最常见的方式，是从对话里的文件链接打开。
+
+当 Cebian 创建或保存了文件，它通常会在回复里给出类似「查看文件」「打开目录」的链接。点击后，会打开一个独立的 VFS 浏览器页面。
+
+在 VFS 浏览器里，你可以：
+
+- 查看目录和文件
+- 预览文本、Markdown、图片、音视频等常见文件
+- 下载单个文件
+- 下载整个目录的 zip
+
+如果你只是管理 Prompt 或 Skill，优先使用设置里的对应页面；VFS 浏览器更适合查看文件结果和工作区内容。
+
+## Q&A
+
+<QA>
+	<QAItem q="找不到真实文件夹？">这是正常的。VFS 不是系统目录，它存在浏览器扩展自己的数据区里。</QAItem>
+	<QAItem q="文件太大无法预览怎么办？">可以用右上角下载按钮下载后再打开。</QAItem>
+	<QAItem q="对话里的文件链接打不开怎么办？">可能是文件已经被删除，或者当前浏览器数据被清理过。</QAItem>
+	<QAItem q="想备份这些文件怎么办？">使用 Cebian 的备份功能时，记得包含工作区文件、Prompt 和 Skill。</QAItem>
+</QA>

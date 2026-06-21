@@ -1,0 +1,41 @@
+---
+import { getDict, type Lang } from '../../lib/i18n';
+interface Props { lang: Lang; }
+const { lang } = Astro.props;
+const t = getDict(lang);
+---
+<section class="trust" aria-label={t.home.trust.map((i) => i.title).join('，')}>
+  <ul class="wrap trust-row">
+    {t.home.trust.map((item) => (
+      <li class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+        <span>
+          <b>{item.title}</b>
+          <span class="sub">{item.note}</span>
+        </span>
+      </li>
+    ))}
+  </ul>
+</section>
+
+<style>
+  .trust { border-block: 1px solid var(--line); background: var(--surface-2); }
+  .trust-row { list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); padding-inline: clamp(20px, 4vw, 40px); }
+  .trust-item { display: flex; align-items: center; gap: 11px; padding: 26px 28px; font-size: 14.5px; color: var(--ink); border-left: 1px solid var(--line); }
+  .trust-item:first-child { border-left: none; padding-left: 0; }
+  .trust-item svg { width: 18px; height: 18px; color: var(--accent); flex: none; }
+  .trust-item b { font-weight: 600; display: block; }
+  .trust-item .sub { font-size: 12.5px; color: var(--ink-subtle); margin-top: 1px; display: block; }
+
+  @media (max-width: 900px) {
+    .trust-row { grid-template-columns: repeat(2, 1fr); }
+    .trust-item { padding: 22px 24px; }
+    .trust-item:nth-child(2) { border-left: none; }
+    .trust-item:nth-child(odd) { padding-left: 0; }
+  }
+  @media (max-width: 520px) {
+    .trust-row { grid-template-columns: 1fr; }
+    .trust-item { border-left: none; padding-inline: 0; border-top: 1px solid var(--line); }
+    .trust-item:first-child { border-top: none; }
+  }
+</style>

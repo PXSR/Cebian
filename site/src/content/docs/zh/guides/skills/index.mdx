@@ -1,0 +1,122 @@
+---
+title: Skills
+description: 把工作流打包成模型能自取的操作手册。
+group: guides
+order: 4
+---
+
+import Placeholder from '@/components/Placeholder.astro';
+import QA from '@/components/docs/QA.astro';
+import QAItem from '@/components/docs/QAItem.astro';
+
+Skill 是一份给 Agent 使用的操作手册。它可以把某类任务的背景知识、固定步骤、注意事项和脚本放在一起，让模型在需要时自己读取。
+
+如果 Slash Prompt 更像「一段可复用的输入」，那 Skill 更像「一套可复用的工作流」。
+
+![截图](./snapshot.png)
+
+## 适用场景
+
+当一件事需要反复做，而且每次都有一套固定规则时，就适合做成 Skill。
+
+比如：
+
+- 固定格式的调研报告
+- 某个网站的价格对比流程
+- 公司内部系统的操作规范
+- 一组需要配合使用的脚本和参考资料
+
+如果只是想快速插入一段提示词，用 Slash Prompt 就够了；如果需要多个文件、脚本或详细说明，再考虑 Skill。
+
+## Skill Creator skill
+
+如果你还没有写过 Skill，可以先从官方的 Skill Creator skill 开始。
+
+它本身也是一个 Skill，作用是帮你把想法整理成符合 Cebian 结构的 Skill 草稿。你可以直接在对话里描述想做什么，比如「帮我做一个用于调研竞品价格的 Skill」，它会帮你生成目录、`SKILL.md` 和必要的说明。
+
+普通使用的话，可以先让它生成一个能跑起来的版本，再回到技能编辑器里慢慢调整细节。
+
+它会随 Cebian 的 Github Release 一起发布，文件名是 `skill-creator.zip`：
+
+[Cebian Github Releases](https://github.com/maotoumao/Cebian/releases)
+
+安装方式：
+
+1. 下载 `skill-creator.zip`
+2. 打开「设置 → 技能」
+3. 点击「导入…」
+4. 选择刚才下载的 zip
+
+导入后，你就可以在对话里让 Cebian 帮你创建或修改 Skill。
+
+## 创建 Skill
+
+入口在「设置 → 技能」。
+
+点击「创建技能」后，Cebian 会自动生成一个 `new-skill` 文件夹，里面包含：
+
+- `SKILL.md`：技能入口文件，写说明和触发条件
+- `scripts/`：可选，用来放脚本
+- `references/`：可选，用来放参考资料
+
+一个最小的 `SKILL.md` 大致长这样：
+
+```md
+---
+name: price-compare
+description: 对多个商品页面做价格对比，并整理成表格。
+---
+
+## Instructions
+
+当用户要求比较价格时，先读取当前页面，再整理商品名、价格、链接和备注。
+```
+
+`description` 很重要。Agent 会先看技能索引，判断当前请求是否适合读取这个 Skill。
+
+## 触发机制
+
+你不需要手动在对话里点某个 Skill。
+
+当用户请求和某个 Skill 的名字或描述匹配时，Agent 会先读取它的 `SKILL.md`，再按里面的说明继续工作。
+
+如果 Skill 里提到还需要读取 `references/` 或运行 `scripts/`，Agent 也会按需使用这些文件。
+
+## 导入与导出
+
+技能页面支持导入和导出。
+
+- 「导入」：选择一个 `.zip` 技能包，确认后写入 VFS
+- 「导出」：导出当前选中的 Skill
+- 「导出全部」：把所有 Skill 打包成一个备份 zip
+
+导入时如果同名 Skill 已存在，可以选择覆盖，也可以保留两份。
+
+> 覆盖已有 Skill 时，之前授予过的「始终允许」权限会被清掉。新的脚本如果要运行，需要重新确认。
+
+## 权限与脚本
+
+Skill 可以包含脚本，也可以声明需要的权限。
+
+当脚本要执行一些敏感操作时，Cebian 会在对话里弹出授权卡片。你可以选择：
+
+- 拒绝
+- 仅本次允许
+- 始终允许此技能
+
+普通 Skill 只写说明和参考资料也可以，不一定要写脚本。刚开始建议先从纯说明型 Skill 写起。
+
+## 文件位置
+
+Skill 保存在 VFS 的 `~/.cebian/skills/` 目录下。
+
+你一般不需要手动打开这个路径，直接在「设置 → 技能」里管理即可。备份时选择「技能与提示词」，Skill 文件也会一起备份。
+
+## Q&A
+
+<QA>
+	<QAItem q="Skill 没有被触发怎么办？">检查 <code>name</code> 和 <code>description</code> 是否说清楚了适用场景。Agent 主要靠它们判断要不要读取这个 Skill。</QAItem>
+	<QAItem q="Skill 写得太长怎么办？">把稳定规则放在 <code>SKILL.md</code>，大段参考资料放到 <code>references/</code>。</QAItem>
+	<QAItem q="不确定要不要写脚本怎么办？">先不写。等确实需要自动执行时，再加 <code>scripts/</code>。</QAItem>
+	<QAItem q="导入别人的 Skill 要注意什么？">先看一下 <code>SKILL.md</code> 和 <code>scripts/</code>，确认来源可信再使用。</QAItem>
+</QA>

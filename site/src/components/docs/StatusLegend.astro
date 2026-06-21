@@ -1,0 +1,54 @@
+---
+type StatusColor = 'blue' | 'green' | 'sky' | 'yellow' | 'red' | 'gray';
+
+interface StatusItem {
+  color: StatusColor;
+  label: string;
+  text: string;
+}
+
+interface Props {
+  items: StatusItem[];
+}
+
+const { items } = Astro.props;
+---
+<ul class="status-list">
+  {items.map((item) => (
+    <li>
+      <span class:list={['status-dot', `status-${item.color}`]} aria-hidden="true"></span>
+      <span><strong>{item.label}</strong>：{item.text}</span>
+    </li>
+  ))}
+</ul>
+
+<style>
+  .status-list {
+    margin-top: 14px;
+    padding-left: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+  .status-list li {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding-left: 0;
+  }
+  .status-dot {
+    width: 0.68em;
+    height: 0.68em;
+    border-radius: 999px;
+    flex: none;
+    transform: translateY(0.06em);
+    box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 14%, transparent);
+  }
+  .status-blue { color: #0ea5e9; background: #0ea5e9; }
+  .status-green { color: #10b981; background: #10b981; }
+  .status-sky { color: #38bdf8; background: #38bdf8; opacity: 0.75; }
+  .status-yellow { color: #f59e0b; background: #f59e0b; }
+  .status-red { color: #ef4444; background: #ef4444; }
+  .status-gray { color: var(--ink-subtle); background: color-mix(in srgb, var(--ink-subtle) 55%, transparent); }
+</style>

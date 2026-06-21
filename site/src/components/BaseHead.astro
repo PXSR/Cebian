@@ -1,0 +1,111 @@
+---
+// 站点 <head>：SEO meta、三语 hreflang、OG、字体（自托管）、主题预绘制脚本。
+//
+// 字体：不走 fontsource 的自动 CSS（那套写死 font-display: swap，会在缓存命中时
+// 仍先用回退字渲染一帧再换字，导致标题里拉丁词宽度突变、后续中文横向抖动）。
+// 改为显式 @font-face + `font-display: optional` + preload：缓存命中时直接用 webfont
+// 渲染、零换字闪烁；首次访问慢网络则整页用系统回退字（本站中文为主、webfont 仅覆盖
+// 拉丁，这个取舍可接受）。woff2 以 ?url 导入，拿到构建期带 hash 的真实地址。
+import hankenWoff2 from '@fontsource-variable/hanken-grotesk/files/hanken-grotesk-latin-wght-normal.woff2?url';
+import jetbrainsWoff2 from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2?url';
+import '../styles/tokens.css';
+import { LOCALES, LANGS, DEFAULT_LANG, localePath, type Lang } from '../lib/i18n';
+
+const fontFaceCss = `
+@font-face {
+  font-family: 'Hanken Grotesk Variable';
+  font-style: normal;
+  font-display: optional;
+  font-weight: 100 900;
+  src: url('${hankenWoff2}') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono Variable';
+  font-style: normal;
+  font-display: optional;
+  font-weight: 100 800;
+  src: url('${jetbrainsWoff2}') format('woff2');
+}`;
+
+interface Props {
+  lang: Lang;
+  title: string;
+  description: string;
+  /** 无 locale 前缀的当前路径，如 "/docs"。用于 canonical + hreflang。 */
+  path: string;
+  ogType?: 'website' | 'article';
+  noindex?: boolean;
+  /** 是否为带 locale 的可索引页。false 用于无前缀的错误页（404），
+   *  此时不输出 canonical / hreflang / og:url，避免指向不存在的本地化 URL。 */
+  localized?: boolean;
+}
+
+const {
+  lang,
+  title,
+  description,
+  path,
+  ogType = 'website',
+  noindex = false,
+  localized = true,
+} = Astro.props;
+
+const site = Astro.site ?? new URL('https://cebian.catcat.work');
+const meta = LOCALES[lang];
+
+const canonical = new URL(localePath(lang, path), site).toString();
+const ogImage = new URL('/icon/128.png', site).toString();
+
+// hreflang：三语互指 + x-default 指向默认语言（用 DEFAULT_LANG 作单一来源）。
+const alternates = LANGS.map((l) => ({
+  hreflang: LOCALES[l].htmlLang,
+  href: new URL(localePath(l, path), site).toString(),
+}));
+const xDefault = new URL(localePath(DEFAULT_LANG, path), site).toString();
+---
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="generator" content={Astro.generator} />
+
+<title>{title}</title>
+<meta name="description" content={description} />
+{noindex && <meta name="robots" content="noindex" />}
+
+{localized && (
+  <>
+    <link rel="canonical" href={canonical} />
+    {alternates.map((a) => <link rel="alternate" hreflang={a.hreflang} href={a.href} />)}
+    <link rel="alternate" hreflang="x-default" href={xDefault} />
+  </>
+)}
+
+<link rel="icon" type="image/png" sizes="32x32" href="/icon/32.png" />
+<link rel="icon" type="image/png" sizes="128x128" href="/icon/128.png" />
+<link rel="apple-touch-icon" href="/icon/128.png" />
+
+<!-- 字体 preload（高优先级拉取）+ 显式 @font-face（font-display: optional）。 -->
+<link rel="preload" href={hankenWoff2} as="font" type="font/woff2" crossorigin="anonymous" />
+<link rel="preload" href={jetbrainsWoff2} as="font" type="font/woff2" crossorigin="anonymous" />
+<style set:html={fontFaceCss} is:global></style>
+
+<meta property="og:site_name" content="Cebian" />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:type" content={ogType} />
+{localized && <meta property="og:url" content={canonical} />}
+<meta property="og:image" content={ogImage} />
+<meta property="og:locale" content={meta.ogLocale} />
+<meta name="twitter:card" content="summary" />
+
+<!-- 首屏绘制前定主题，避免闪烁。默认跟随系统。 -->
+<script is:inline>
+  (function () {
+    try {
+      var t = localStorage.getItem('cebian-theme');
+      var m = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', t === 'dark' || t === 'light' ? t : m);
+    } catch (e) {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  })();
+</script>

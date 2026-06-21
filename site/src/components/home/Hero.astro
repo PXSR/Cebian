@@ -1,0 +1,82 @@
+---
+import { Image } from 'astro:assets';
+import { getDict, localePath, type Lang } from '../../lib/i18n';
+import heroShot from './snapshot.png';
+
+interface Props { lang: Lang; }
+const { lang } = Astro.props;
+const t = getDict(lang);
+const h = t.home.hero;
+---
+<section class="hero">
+  <div class="hero-glow" aria-hidden="true"></div>
+  <div class="wrap hero-inner">
+    <div class="hero-text reveal">
+      <h1>{h.titleLead} <span class="accent">{h.titleAccent}</span></h1>
+      <p class="hero-sub">{t.site.description}</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#install">
+          {h.ctaInstall}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </a>
+        <a class="btn btn-secondary" href={localePath(lang, '/docs')}>{h.ctaDocs}</a>
+      </div>
+    </div>
+    <div class="hero-media reveal" style="animation-delay: .12s;">
+      <div class="hero-shot">
+        <Image src={heroShot} alt={h.heroShotLabel} widths={[430, 860, 1030]} sizes="(max-width: 900px) 78vw, 430px" quality={100} loading="eager" />
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .hero { position: relative; overflow: hidden; display: flex; align-items: center; min-height: min(86vh, 760px); padding-block: clamp(2.5rem, 5vw, 4rem); }
+  .hero-glow {
+    position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(60% 70% at 72% 18%, color-mix(in srgb, var(--accent-fill) 16%, transparent), transparent 70%);
+  }
+  .hero-inner { position: relative; z-index: 1; width: 100%; display: grid; grid-template-columns: 1.02fr 1.1fr; gap: clamp(32px, 5vw, 64px); align-items: center; }
+  .hero h1 { font-size: clamp(38px, 5.6vw, 66px); font-weight: 800; letter-spacing: -0.04em; line-height: 1.02; }
+  .hero-sub { margin-top: 22px; max-width: 52ch; font-size: clamp(16px, 1.4vw, 18px); color: var(--ink-muted); line-height: 1.6; }
+  .hero-cta { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 12px; }
+
+  /* 斜置的「悬浮截图」立体效果：透视容器 + 轻微 3D 旋转 + 分层投影。 */
+  .hero-shot { perspective: 1600px; display: flex; justify-content: center; }
+  .hero-shot :global(img) {
+    width: 100%; max-width: 430px; height: auto;
+    border-radius: 10px; border: 1px solid var(--line);
+    box-shadow:
+      0 2px 4px rgba(24, 24, 27, 0.04),
+      0 14px 28px -10px rgba(24, 24, 27, 0.16),
+      0 44px 70px -28px rgba(24, 24, 27, 0.26);
+    transform: rotateY(-16deg) rotateX(6deg) rotate(0.4deg);
+    transform-origin: center;
+    transition: transform .6s var(--ease), box-shadow .6s var(--ease);
+  }
+  .hero-shot:hover :global(img) {
+    transform: rotateY(-7deg) rotateX(2deg);
+    box-shadow:
+      0 2px 4px rgba(24, 24, 27, 0.04),
+      0 18px 32px -10px rgba(24, 24, 27, 0.18),
+      0 54px 84px -30px rgba(24, 24, 27, 0.3);
+  }
+  [data-theme="dark"] .hero-shot :global(img) {
+    border-color: var(--line-2);
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.5),
+      0 24px 48px -16px rgba(0, 0, 0, 0.6),
+      0 48px 80px -28px rgba(0, 0, 0, 0.7);
+  }
+
+  @media (max-width: 900px) {
+    .hero-inner { grid-template-columns: 1fr; gap: 36px; }
+    /* 单列时收平倾斜，保持截图可读。 */
+    .hero-shot :global(img) { transform: rotateY(-8deg) rotateX(3deg); max-width: 360px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-shot :global(img) { transition: none; }
+  }
+</style>
+

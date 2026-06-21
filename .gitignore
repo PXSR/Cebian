@@ -35,5 +35,8 @@ web-ext.config.ts
 site/.astro/
 site/dist/
 
-# Private notes folder, never committed
-docs/
+# Design mockup / visual draft (working artifacts, not the shipped site)
+site/mockup/
+
+# Private notes folder, never committed (root only — must NOT match site/src/content/docs/)
+/docs/

@@ -1,67 +1,113 @@
 ---
-import type { Lang } from '../i18n';
-import { getDict, localePath } from '../i18n';
+import { getDict, localePath, type Lang } from '../lib/i18n';
+import { SOCIAL } from '../lib/social';
 
 interface Props { lang: Lang; }
 const { lang } = Astro.props;
 const t = getDict(lang);
+
+const GH = 'https://github.com/maotoumao/Cebian';
+
+const productLinks = [
+  { href: localePath(lang, '/docs'), label: t.footer.docs },
+  { href: localePath(lang, '/changelog'), label: t.footer.changelog },
+  { href: localePath(lang, '/docs/getting-started/installation'), label: t.footer.installGuide },
+];
+const resourceLinks = [
+  { href: GH, label: t.footer.github, external: true },
+  { href: `${GH}/releases/latest`, label: t.footer.releases, external: true },
+  { href: `${GH}/issues`, label: t.footer.issues, external: true },
+];
+const moreLinks = [
+  { href: localePath(lang, '/sponsor'), label: t.footer.sponsor, external: false },
+  // 隐私声明直接指向仓库内的政策文件（按语言取中英版本）。
+  { href: `${GH}/blob/master/${lang === 'en' ? 'PRIVACY.md' : 'PRIVACY.zh-CN.md'}`, label: t.footer.privacy, external: true },
+  { href: localePath(lang, '/about'), label: t.footer.about, external: false },
+];
+
+// 底部社交图标（顺序：X → 小红书 → 微信公众号 → bilibili）。渠道 href/图标来自 lib/social，
+// 标签按场景取 footer.social。
+const socials = [
+  { label: t.footer.social.x, ...SOCIAL.x },
+  { label: t.footer.social.xiaohongshu, ...SOCIAL.xiaohongshu },
+  { label: t.footer.social.wechat, ...SOCIAL.wechatPublic },
+  { label: t.footer.social.bilibili, ...SOCIAL.bilibili },
+];
 ---
-<footer class="mt-24 border-t" style="border-color: var(--border);">
-  <div class="container-hero py-12 grid gap-10 md:grid-cols-[1.4fr_1fr_1fr]">
-    <div>
-      <div class="flex items-center gap-2.5">
-        <img src="/icon/48.png" alt="" width="22" height="22" class="rounded-[5px]" />
-        <span class="font-display text-[17px] font-semibold">Cebian</span>
-      </div>
-      <p class="mt-4 text-[13.5px] leading-relaxed max-w-sm" style="color: var(--fg-muted);">
-        {t.footer.tagline}
-      </p>
-      <p class="mt-2 text-[12.5px]" style="color: var(--fg-subtle);">
-        {t.footer.made_with}{' '}
-        <a
-          href={t.footer.author_url}
-          target="_blank"
-          rel="noopener"
-          class="link-muted underline underline-offset-2 decoration-dotted"
-          style="color: var(--fg-muted);"
-        >{t.footer.author}</a>
-        {' · '}{t.footer.license}
+<footer class="footer">
+  <div class="wrap footer-grid">
+    <div class="footer-about">
+      <a class="brand" href={localePath(lang, '/')}>
+        <img src="/icon/128.png" alt="" width="22" height="22" />
+        <span>Cebian</span>
+      </a>
+      <p>{t.footer.tagline}</p>
+      <p class="meta">
+        {t.footer.createdBy}
+        <a href="https://github.com/maotoumao" target="_blank" rel="noopener">maotoumao</a>
+        · AGPL-3.0
       </p>
     </div>
 
-    <div>
-      <div class="text-[12px] uppercase tracking-[0.14em] mb-3" style="color: var(--fg-subtle);">
-        {t.footer.links_heading}
-      </div>
-      <ul class="space-y-2 text-[13.5px]">
-        <li><a href={localePath(lang, '/install-guide')} class="link-muted">{t.nav.install_guide}</a></li>
-        <li><a href={localePath(lang, '/docs')} class="link-muted">{t.nav.docs}</a></li>
-        <li><a href={localePath(lang, '/about')} class="link-muted">{t.nav.about}</a></li>
-      </ul>
+    <div class="footer-col">
+      <h4>{t.footer.productHeading}</h4>
+      <ul>{productLinks.map((l) => <li><a href={l.href}>{l.label}</a></li>)}</ul>
     </div>
-
-    <div>
-      <div class="text-[12px] uppercase tracking-[0.14em] mb-3" style="color: var(--fg-subtle);">
-        {t.footer.resources_heading}
-      </div>
-      <ul class="space-y-2 text-[13.5px]">
-        <li><a href="https://github.com/maotoumao/Cebian" class="link-muted" target="_blank" rel="noopener">GitHub</a></li>
-        <li><a href="https://github.com/maotoumao/Cebian/releases/latest" class="link-muted" target="_blank" rel="noopener">Releases</a></li>
-        <li><a href="https://github.com/maotoumao/Cebian/issues" class="link-muted" target="_blank" rel="noopener">Issues</a></li>
-        <li><a href={localePath(lang, '/privacy')} class="link-muted">{t.footer.privacy}</a></li>
-        <li><a href={localePath(lang, '/about')} class="link-muted">{t.footer.contact}</a></li>
-      </ul>
+    <div class="footer-col">
+      <h4>{t.footer.resourcesHeading}</h4>
+      <ul>{resourceLinks.map((l) => <li><a href={l.href} target="_blank" rel="noopener">{l.label}</a></li>)}</ul>
+    </div>
+    <div class="footer-col">
+      <h4>{t.footer.moreHeading}</h4>
+      <ul>{moreLinks.map((l) => <li><a href={l.href} target={l.external ? '_blank' : undefined} rel={l.external ? 'noopener' : undefined}>{l.label}</a></li>)}</ul>
     </div>
   </div>
-  <div class="container-hero pb-8 text-[12px]" style="color: var(--fg-subtle);">
-    {t.footer.copyright}
+  <div class="footer-base wrap">
+    <div class="footer-base-left">
+      <span>© 2026 Cebian</span>
+      <ul class="socials" aria-label={t.footer.social.follow}>
+        {socials.map((s) => (
+          <li>
+            <a href={s.href} target="_blank" rel="noopener" aria-label={s.label} title={s.label}>
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={s.icon} /></svg>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+    <span class="mono">cebian.catcat.work</span>
   </div>
 </footer>
 
 <style>
-  .link-muted {
-    color: var(--fg-muted);
-    transition: color .15s ease;
+  .footer { border-top: 1px solid var(--line); background: var(--surface); }
+  .footer-grid { display: grid; grid-template-columns: 1.7fr 1fr 1fr 1fr; gap: 40px; padding-block: 56px 32px; }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 18px; letter-spacing: -0.03em; }
+  .brand img { width: 22px; height: 22px; border-radius: 6px; }
+  .footer-about p { margin-top: 14px; max-width: 30ch; font-size: 14px; color: var(--ink-muted); }
+  .footer-about .meta { margin-top: 14px; font-size: 13px; color: var(--ink-subtle); }
+  .footer-about .meta a { color: var(--ink-muted); border-bottom: 1px solid var(--line-2); }
+  .footer-about .meta a:hover { color: var(--ink); }
+  .footer-col h4 { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 14px; }
+  .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 11px; }
+  .footer-col a { font-size: 14px; color: var(--ink-muted); transition: color .15s; }
+  .footer-col a:hover { color: var(--accent); }
+  .footer-base {
+    border-top: 1px solid var(--line); padding-block: 18px;
+    display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+    font-size: 13px; color: var(--ink-subtle);
   }
-  .link-muted:hover { color: var(--fg); }
+  .footer-base-left { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .socials { list-style: none; display: flex; align-items: center; gap: 6px; }
+  .socials a {
+    display: grid; place-items: center; width: 30px; height: 30px;
+    border-radius: 8px; color: var(--ink-subtle);
+    transition: color .15s, background .15s;
+  }
+  .socials a:hover { color: var(--ink); background: var(--surface-2); }
+  .socials svg { width: 16px; height: 16px; }
+  @media (max-width: 820px) {
+    .footer-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
+    .footer-about { grid-column: 1 / -1; }
+  }
 </style>

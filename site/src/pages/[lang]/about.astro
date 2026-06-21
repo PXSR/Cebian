@@ -1,100 +1,115 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import PageHeader from '../../components/PageHeader.astro';
-import ArticleSection from '../../components/ArticleSection.astro';
-import { getDict, type Lang } from '../../i18n';
+import { getDict, localePath, langStaticPaths, type Lang } from '../../lib/i18n';
 
 export function getStaticPaths() {
-  return [{ params: { lang: 'zh' } }, { params: { lang: 'en' } }];
+  return langStaticPaths();
 }
 
 const lang = Astro.params.lang as Lang;
 const t = getDict(lang);
+const ab = t.about;
+
+const GH = 'https://github.com/maotoumao/Cebian';
+const AUTHOR = 'https://github.com/maotoumao';
+const LICENSE_URL = `${GH}/blob/master/LICENSE`;
+const ISSUES = `${GH}/issues`;
+// 隐私声明直接指向仓库内的政策文件（按语言取中英版本）。
+const PRIVACY_URL = `${GH}/blob/master/${lang === 'en' ? 'PRIVACY.md' : 'PRIVACY.zh-CN.md'}`;
+
+const arrow =
+  'M7 17 17 7M9 7h8v8';
+
+// 「相关链接」一行：站内 + 外链混排。
+const links = [
+  { label: ab.links.repo, href: GH, external: true },
+  { label: ab.links.releases, href: `${GH}/releases/latest`, external: true },
+  { label: ab.links.sponsor, href: localePath(lang, '/sponsor'), external: false },
+  { label: ab.links.privacy, href: PRIVACY_URL, external: true },
+];
 ---
-<BaseLayout lang={lang} title={t.about.title} description={t.about.title} path="/about">
-  <PageHeader eyebrow={t.about.eyebrow} title={t.about.title} />
+<BaseLayout lang={lang} title={`${ab.title} — ${t.site.name}`} description={ab.lead} path="/about">
+  <section class="wrap ab">
+    <header class="ab-head">
+      <h1>{ab.title}</h1>
+      <p>{ab.lead}</p>
+    </header>
 
-  <article class="container-wide pb-24">
-    <ArticleSection number="01" tag={t.about.tags.name} title={t.about.name_heading}>
-      <p>{t.about.name_body}</p>
-    </ArticleSection>
+    <section class="ab-what">
+      <h2>{ab.whatTitle}</h2>
+      <p>{ab.whatBody}</p>
+    </section>
 
-    <ArticleSection number="02" tag={t.about.tags.license} title={t.about.license_heading}>
-      <p>{t.about.license_body}</p>
-    </ArticleSection>
-
-    <ArticleSection number="03" tag={t.about.tags.feedback} title={t.about.feedback_heading}>
-      <p>{t.about.feedback_body}</p>
-      <ul class="mt-5 space-y-2.5 text-[14px]">
-        <li class="flex items-center gap-3">
-          <span class="font-mono text-[12px] uppercase tracking-[0.18em]" style="color: var(--fg-subtle);">Repo</span>
-          <a href="https://github.com/maotoumao/Cebian" target="_blank" rel="noopener" style="color: var(--accent);">github.com/maotoumao/Cebian</a>
-        </li>
-        <li class="flex items-center gap-3">
-          <span class="font-mono text-[12px] uppercase tracking-[0.18em]" style="color: var(--fg-subtle);">Issues</span>
-          <a href="https://github.com/maotoumao/Cebian/issues" target="_blank" rel="noopener" style="color: var(--accent);">github.com/maotoumao/Cebian/issues</a>
-        </li>
-      </ul>
-    </ArticleSection>
-
-    <ArticleSection number="04" tag={t.about.tags.sponsor} title={t.about.sponsor_heading}>
-      <p>{t.about.sponsor_body}</p>
-      <div class="mt-6 grid gap-4 sm:grid-cols-2">
-        <a
-          href="/sponsor/wechat-qr.jpeg"
-          target="_blank" rel="noopener"
-          class="group rounded-xl p-5 flex flex-col items-start gap-3 transition-transform hover:-translate-y-0.5"
-          style="border: 1px solid var(--border); background: var(--bg-elev);"
-        >
-          <div class="font-mono text-[12px] uppercase tracking-[0.18em]" style="color: var(--accent);">{t.about.sponsor_wechat_label}</div>
-          <h3 class="text-[15.5px] font-medium" style="color: var(--fg);">{t.about.sponsor_wechat_title}</h3>
-          <p class="text-[13.5px] leading-relaxed" style="color: var(--fg-muted);">{t.about.sponsor_wechat_body}</p>
-          <span class="mt-1 inline-flex items-center gap-1.5 text-[13px] font-medium" style="color: var(--accent);">
-            {t.about.sponsor_wechat_cta}
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M7 7h10v10" /></svg>
-          </span>
+    <div class="ab-cards">
+      <article class="ab-card">
+        <h2>{ab.authorTitle}</h2>
+        <p>{ab.authorBody}</p>
+        <a class="ab-card-link" href={AUTHOR} target="_blank" rel="noopener">
+          maotoumao
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={arrow}/></svg>
         </a>
-        <a
-          href="https://ko-fi.com/maotoumao"
-          target="_blank" rel="noopener"
-          class="group rounded-xl p-5 flex flex-col items-start gap-3 transition-transform hover:-translate-y-0.5"
-          style="border: 1px solid var(--border); background: var(--bg-elev);"
-        >
-          <div class="font-mono text-[12px] uppercase tracking-[0.18em]" style="color: var(--accent);">Ko-fi</div>
-          <h3 class="text-[15.5px] font-medium" style="color: var(--fg);">{t.about.sponsor_kofi_title}</h3>
-          <p class="text-[13.5px] leading-relaxed" style="color: var(--fg-muted);">{t.about.sponsor_kofi_body}</p>
-          <span class="mt-1 inline-flex items-center gap-1.5 text-[13px] font-medium" style="color: var(--accent);">
-            ko-fi.com/maotoumao
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M7 7h10v10" /></svg>
-          </span>
+      </article>
+
+      <article class="ab-card">
+        <h2>{ab.licenseTitle}</h2>
+        <p>{ab.licenseBody}</p>
+        <a class="ab-card-link" href={LICENSE_URL} target="_blank" rel="noopener">
+          AGPL-3.0
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={arrow}/></svg>
         </a>
+      </article>
+
+      <article class="ab-card">
+        <h2>{ab.feedbackTitle}</h2>
+        <p>{ab.feedbackBody}</p>
+        <a class="ab-card-link" href={ISSUES} target="_blank" rel="noopener">
+          {ab.feedbackCta}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={arrow}/></svg>
+        </a>
+      </article>
+    </div>
+
+    <section class="ab-links">
+      <h2>{ab.linksHeading}</h2>
+      <div class="ab-link-row">
+        {links.map((l) => (
+          <a class="ab-chip" href={l.href} target={l.external ? '_blank' : undefined} rel={l.external ? 'noopener' : undefined}>
+            {l.label}
+            {l.external && (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={arrow}/></svg>
+            )}
+          </a>
+        ))}
       </div>
-    </ArticleSection>
-
-    <ArticleSection number="05" tag={t.about.tags.contact} title={t.about.contact_heading}>
-      <p>{t.about.contact_body}</p>
-      <ul class="mt-5 space-y-2.5 text-[14px]">
-        <li class="flex items-center gap-3">
-          <span class="font-mono text-[12px] uppercase tracking-[0.18em]" style="color: var(--fg-subtle);">Author</span>
-          <a href="https://github.com/maotoumao" target="_blank" rel="noopener" style="color: var(--accent);">github.com/maotoumao</a>
-        </li>
-        <li class="flex items-center gap-3">
-          <span class="font-mono text-[12px] uppercase tracking-[0.18em]" style="color: var(--fg-subtle);">X</span>
-          <a href="https://x.com/maotoumao0_0" target="_blank" rel="noopener" style="color: var(--accent);">@maotoumao0_0</a>
-        </li>
-        <li class="flex items-center gap-3">
-          <span class="font-mono text-[12px] uppercase tracking-[0.18em]" style="color: var(--fg-subtle);">Bilibili</span>
-          <a href="https://space.bilibili.com/12866223" target="_blank" rel="noopener" style="color: var(--accent);">{t.about.socials.bilibili_name}</a>
-        </li>
-        <li class="flex items-center gap-3">
-          <span class="font-mono text-[12px] uppercase tracking-[0.18em]" style="color: var(--fg-subtle);">{t.about.socials.xhs_label}</span>
-          <a href="https://www.xiaohongshu.com/user/profile/5ce6085200000000050213a6" target="_blank" rel="noopener" style="color: var(--accent);">{t.about.socials.xhs_name}</a>
-        </li>
-        <li class="flex items-center gap-3">
-          <span class="font-mono text-[12px] uppercase tracking-[0.18em]" style="color: var(--fg-subtle);">{t.about.socials.wechat_label}</span>
-          <a href="/sponsor/wechat_channel.jpg" target="_blank" rel="noopener" style="color: var(--accent);">{t.about.socials.wechat_name}</a>
-        </li>
-      </ul>
-    </ArticleSection>
-  </article>
+    </section>
+  </section>
 </BaseLayout>
+
+<style>
+  .ab { padding-block: clamp(40px, 6vw, 72px) var(--space-section); max-width: 820px; }
+  .ab-head h1 { font-size: clamp(34px, 4.6vw, 52px); font-weight: 800; letter-spacing: -0.035em; }
+  .ab-head p { margin-top: 14px; max-width: 56ch; font-size: 17px; color: var(--ink-muted); }
+
+  .ab-what { margin-top: 40px; }
+  .ab-what h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+  .ab-what p { margin-top: 12px; max-width: 64ch; font-size: 16px; line-height: 1.7; color: var(--ink-muted); }
+
+  .ab-cards { margin-top: 36px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .ab-card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); padding: 22px 24px; }
+  .ab-card h2 { font-size: 14px; font-weight: 700; color: var(--ink); }
+  .ab-card p { margin-top: 8px; font-size: 14px; line-height: 1.6; color: var(--ink-muted); }
+  .ab-card-link { margin-top: auto; padding-top: 16px; display: inline-flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 600; color: var(--accent); }
+  .ab-card-link svg { width: 14px; height: 14px; }
+  .ab-card-link:hover { text-decoration: underline; }
+
+  .ab-links { margin-top: 40px; padding-top: 32px; border-top: 1px solid var(--line); }
+  .ab-links h2 { font-size: 16px; font-weight: 700; }
+  .ab-link-row { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; }
+  .ab-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--ink); padding: 9px 14px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface); transition: border-color .15s, color .15s; }
+  .ab-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .ab-chip svg { width: 14px; height: 14px; }
+
+  @media (max-width: 760px) {
+    .ab-cards { grid-template-columns: 1fr; }
+  }
+</style>

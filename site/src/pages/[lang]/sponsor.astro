@@ -1,0 +1,116 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getDict, langStaticPaths, type Lang } from '../../lib/i18n';
+import { SOCIAL } from '../../lib/social';
+
+export function getStaticPaths() {
+  return langStaticPaths();
+}
+
+const lang = Astro.params.lang as Lang;
+const t = getDict(lang);
+const sp = t.sponsor;
+
+const KOFI = 'https://ko-fi.com/maotoumao';
+const WECHAT_QR = '/sponsor/wechat-qr.jpeg';
+
+// 「关注作者」渠道：博客 + 四个品牌渠道，href/图标来自 lib/social，标签取 sponsor.channels。
+const channels = [
+  { label: sp.channels.blog, ...SOCIAL.blog },
+  { label: sp.channels.bilibili, ...SOCIAL.bilibili },
+  { label: sp.channels.xiaohongshu, ...SOCIAL.xiaohongshu },
+  { label: sp.channels.x, ...SOCIAL.x },
+  { label: sp.channels.wechatPublic, ...SOCIAL.wechatPublic },
+];
+---
+<BaseLayout lang={lang} title={`${sp.title} — ${t.site.name}`} description={sp.lead} path="/sponsor">
+  <section class="wrap sp">
+    <header class="sp-head">
+      <h1>{sp.title}</h1>
+      <p>{sp.lead}</p>
+    </header>
+
+    <div class="sp-grid">
+      <!-- Ko-fi -->
+      <article class="sp-card">
+        <h2>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4Z"/><path d="M6 2v2M10 2v2M14 2v2"/></svg>
+          {sp.kofi.title}
+        </h2>
+        <p>{sp.kofi.desc}</p>
+        <span class="sp-addr mono">ko-fi.com/maotoumao</span>
+        <div class="sp-action">
+          <a class="btn btn-primary" href={KOFI} target="_blank" rel="noopener">
+            {sp.kofi.cta}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg>
+          </a>
+        </div>
+      </article>
+
+      <!-- 微信赞赏 -->
+      <article class="sp-card">
+        <h2>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3M21 14v.01M14 21h.01M17 21h.01M21 17v.01M21 21v.01M21 18.5v.01"/></svg>
+          {sp.wechat.title}
+        </h2>
+        <p>{sp.wechat.desc}</p>
+        <div class="sp-action">
+          <div class="sp-qr">
+            <img src={WECHAT_QR} alt={sp.wechat.title} width="96" height="96" />
+            <span class="sp-qr-hint">
+              {sp.wechat.hint}
+              <a href={WECHAT_QR} target="_blank" rel="noopener">{sp.wechat.viewLarge}</a>
+            </span>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <!-- 关注作者 -->
+    <section class="sp-follow">
+      <h2>{sp.followHeading}</h2>
+      <div class="sp-links">
+        {channels.map((c) => (
+          <a class="sp-link" href={c.href} target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={c.icon} /></svg>
+            {c.label}
+          </a>
+        ))}
+      </div>
+    </section>
+  </section>
+</BaseLayout>
+
+<style>
+  .sp { padding-block: clamp(40px, 6vw, 72px) var(--space-section); max-width: 880px; }
+  .sp-head h1 { font-size: clamp(34px, 4.6vw, 52px); font-weight: 800; letter-spacing: -0.035em; }
+  .sp-head p { margin-top: 14px; max-width: 54ch; font-size: 17px; color: var(--ink-muted); }
+
+  .sp-grid { margin-top: 36px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: stretch; }
+  .sp-card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); padding: 26px 28px; }
+  .sp-card h2 { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; display: flex; align-items: center; gap: 10px; }
+  .sp-card h2 svg { width: 19px; height: 19px; color: var(--accent); }
+  .sp-card p { margin-top: 9px; font-size: 14.5px; color: var(--ink-muted); line-height: 1.6; }
+  .sp-addr { margin-top: 8px; font-size: 12.5px; color: var(--ink-subtle); letter-spacing: -0.01em; }
+
+  /* 操作行贴底，让两张卡片下沿对齐 */
+  .sp-action { margin-top: auto; padding-top: 20px; }
+  .sp-qr { display: flex; align-items: center; gap: 16px; }
+  .sp-qr img { width: 96px; height: 96px; border-radius: 10px; border: 1px solid var(--line-2); object-fit: cover; background: #fff; }
+  .sp-qr-hint { font-size: 13px; color: var(--ink-muted); line-height: 1.6; }
+  .sp-qr-hint a { display: block; margin-top: 4px; color: var(--accent); font-weight: 600; }
+
+  .sp-follow { margin-top: 18px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); padding: 24px 28px; }
+  .sp-follow h2 { font-size: 18px; font-weight: 700; }
+  .sp-links { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; }
+  .sp-link { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); padding: 9px 14px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--bg); transition: border-color .15s, color .15s, transform .15s var(--ease); }
+  .sp-link:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+  .sp-link svg { width: 16px; height: 16px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sp-link:hover { transform: none; }
+  }
+  @media (max-width: 760px) {
+    .sp-grid { grid-template-columns: 1fr; }
+  }
+</style>

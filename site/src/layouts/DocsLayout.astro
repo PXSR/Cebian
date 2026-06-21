@@ -1,0 +1,222 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import { getDict, localePath, type Lang } from '../lib/i18n';
+import { getDocsFor, groupDocs, adjacentDocs, type DocMeta } from '../lib/docs';
+import type { MarkdownHeading } from 'astro';
+
+interface Props {
+  lang: Lang;
+  title: string;
+  description: string;
+  /** 无 locale 前缀的当前路径，如 "/docs/getting-started/introduction" */
+  path: string;
+  /** 当前文档的标题渲染出的 h2/h3，用于「本页」目录 */
+  headings: MarkdownHeading[];
+  /** 占位页：noindex */
+  noindex?: boolean;
+}
+
+const { lang, title, description, path, headings, noindex } = Astro.props;
+const t = getDict(lang);
+
+const docs = await getDocsFor(lang);
+const groups = groupDocs(docs, t.docs.groups);
+const { prev, next } = adjacentDocs(docs, t.docs.groups, path);
+
+const isCurrent = (m: DocMeta) => m.path === path;
+const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+<BaseLayout lang={lang} title={`${title} — ${t.docs.title} — ${t.site.name}`} description={description} path={path} ogType="article" noindex={noindex}>
+  <div class="docs">
+    <!-- 左侧分组导航 -->
+    <nav class="docs-side" aria-label={t.docs.sidebarHeading}>
+      {groups.map((g) => (
+        <div class="side-group">
+          <p class="side-group-label">{g.label}</p>
+          <ul>
+            {g.items.map((m) => (
+              <li>
+                <a href={localePath(lang, m.path)} aria-current={isCurrent(m) ? 'page' : undefined}>{m.title}</a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </nav>
+
+    <!-- 正文 -->
+    <article class="docs-article prose">
+      <h1>{title}</h1>
+      <slot />
+
+      {(prev || next) && (
+        <nav class="docs-pager" aria-label={`${t.docs.prev} / ${t.docs.next}`}>
+          {prev && (
+            <a class="pager-link pager-prev" href={localePath(lang, prev.path)} rel="prev">
+              <span class="pager-dir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>{t.docs.prev}</span>
+              <span class="pager-title">{prev.title}</span>
+            </a>
+          )}
+          {next && (
+            <a class="pager-link pager-next" href={localePath(lang, next.path)} rel="next">
+              <span class="pager-dir">{t.docs.next}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span>
+              <span class="pager-title">{next.title}</span>
+            </a>
+          )}
+        </nav>
+      )}
+    </article>
+
+    <!-- 右侧本页目录（无小标题时不渲染空 nav） -->
+    {toc.length > 0 && (
+      <nav class="docs-toc" aria-label={t.docs.onThisPage}>
+        <p class="toc-head">{t.docs.onThisPage}</p>
+        <ul>
+          {toc.map((h) => (
+            <li class:list={[h.depth === 3 && 'toc-sub']}><a href={`#${h.slug}`}>{h.text}</a></li>
+          ))}
+        </ul>
+      </nav>
+    )}
+  </div>
+
+  <!-- 图片放大遮罩：仅桌面端（fine pointer）的指针增强，正文图片对键盘/读屏用户始终完整可见，
+       故遮罩仅作纯视觉层，不假装成 modal dialog。<img> 由脚本注入。 -->
+  <div class="lightbox" tabindex="-1" hidden></div>
+</BaseLayout>
+
+<style>
+  .docs {
+    display: grid;
+    grid-template-columns: 224px minmax(0, 1fr) 196px;
+    gap: clamp(28px, 4vw, 52px);
+    max-width: 1240px; margin-inline: auto;
+    padding: 40px clamp(20px, 4vw, 40px) 96px;
+  }
+
+  /* left sidebar */
+  .docs-side { position: sticky; top: 78px; align-self: start; max-height: calc(100dvh - 100px); overflow-y: auto; }
+  .side-group + .side-group { margin-top: 24px; }
+  .side-group-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-subtle); margin-bottom: 10px; }
+  .side-group ul { list-style: none; display: flex; flex-direction: column; gap: 1px; }
+  .side-group a { display: block; font-size: 15px; color: var(--ink-muted); padding: 7px 11px; border-radius: 8px; transition: color .15s, background .15s; }
+  .side-group a:hover { color: var(--ink); background: var(--surface-2); }
+  .side-group a[aria-current="page"] { color: var(--accent); background: var(--accent-wash); font-weight: 600; }
+
+  /* on this page */
+  .docs-toc { position: sticky; top: 78px; align-self: start; }
+  .toc-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-subtle); margin-bottom: 10px; }
+  .docs-toc ul { list-style: none; display: flex; flex-direction: column; }
+  .docs-toc a { display: block; font-size: 15px; color: var(--ink-subtle); padding: 5px 0 5px 11px; border-left: 1px solid var(--line); transition: color .15s, border-color .15s; }
+  .docs-toc a:hover, .docs-toc a.is-active { color: var(--accent); border-color: var(--accent); }
+  .docs-toc .toc-sub a { padding-left: 22px; }
+
+  /* prev / next pager — 始终左右两列（含移动端），不硬换行 */
+  .docs-pager { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 48px; padding-top: 28px; border-top: 1px solid var(--line); }
+  .pager-link { display: flex; flex-direction: column; gap: 5px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); transition: border-color .15s, transform .15s var(--ease); min-width: 0; }
+  .pager-link:hover { border-color: var(--ink-subtle); transform: translateY(-2px); }
+  .pager-prev { grid-column: 1; }
+  .pager-next { grid-column: 2; text-align: right; align-items: flex-end; }
+  .pager-dir { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); }
+  .pager-dir svg { width: 13px; height: 13px; }
+  .pager-title { font-size: 15px; font-weight: 600; color: var(--ink); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  @media (max-width: 1080px) {
+    .docs { grid-template-columns: 210px minmax(0, 1fr); }
+    .docs-toc { display: none; }
+  }
+  @media (max-width: 800px) {
+    .docs { grid-template-columns: 1fr; padding-top: 28px; }
+    .docs-side { position: static; max-height: none; overflow: visible; padding-bottom: 16px; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+  }
+
+  /* 图片放大遮罩 */
+  .lightbox {
+    position: fixed; inset: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    padding: clamp(20px, 5vw, 56px);
+    background: rgba(0, 0, 0, 0.86);
+    cursor: zoom-out;
+  }
+  .lightbox[hidden] { display: none; }
+  /* <img> 由脚本注入，故用 :global 命中 */
+  .lightbox :global(.lightbox-img) {
+    max-width: min(1100px, 94vw); max-height: 92vh;
+    object-fit: contain;
+    border-radius: var(--radius);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  }
+  /* 仅在脚本判定为桌面端时给正文图片加放大光标 */
+  .docs-article :global(img.zoomable) { cursor: zoom-in; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .lightbox { animation: lb-fade .16s var(--ease); }
+    .lightbox :global(.lightbox-img) { animation: lb-pop .18s var(--ease); }
+  }
+  @keyframes lb-fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes lb-pop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
+</style>
+
+<script>
+  // 「本页」目录：滚动高亮当前小标题，并同步 aria-current 给辅助技术。
+  const links = [...document.querySelectorAll<HTMLAnchorElement>('.docs-toc a')];
+  if (links.length) {
+    const byId = new Map(links.map((a) => [a.getAttribute('href')!.slice(1), a]));
+    const setActive = (a: HTMLAnchorElement | undefined) => {
+      links.forEach((l) => { l.classList.remove('is-active'); l.removeAttribute('aria-current'); });
+      if (a) { a.classList.add('is-active'); a.setAttribute('aria-current', 'location'); }
+    };
+    const obs = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) setActive(byId.get(e.target.id));
+      }
+    }, { rootMargin: '-15% 0px -75% 0px' });
+    document.querySelectorAll('.prose h2[id], .prose h3[id]').forEach((h) => obs.observe(h));
+  }
+</script>
+
+<script>
+  // 图片点击放大：仅在「精确指针 + 可悬停」的桌面端启用（触屏保留原生双指缩放）。
+  // 渐进增强——无 JS 时遮罩保持 hidden，正文图片正常显示。
+  if (matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    const article = document.querySelector('.docs-article');
+    const box = document.querySelector<HTMLElement>('.lightbox');
+    if (article && box) {
+      let lastFocus: HTMLElement | null = null;
+      let prevOverflow = '';
+      const boxImg = document.createElement('img');
+      boxImg.className = 'lightbox-img';
+      box.appendChild(boxImg);
+
+      const openBox = (img: HTMLImageElement) => {
+        boxImg.src = img.currentSrc || img.src;
+        boxImg.alt = img.alt;
+        box.hidden = false;
+        prevOverflow = document.documentElement.style.overflow;
+        document.documentElement.style.overflow = 'hidden';
+        lastFocus = document.activeElement as HTMLElement;
+        box.focus();
+      };
+      const closeBox = () => {
+        box.hidden = true;
+        boxImg.removeAttribute('src');
+        document.documentElement.style.overflow = prevOverflow;
+        lastFocus?.focus();
+      };
+
+      // 标记正文图片可放大（带光标提示），跳过被包进链接的图片。
+      article.querySelectorAll<HTMLImageElement>('img').forEach((img) => {
+        if (!img.closest('a')) img.classList.add('zoomable');
+      });
+
+      article.addEventListener('click', (e) => {
+        const img = (e.target as HTMLElement).closest('img');
+        if (img && img.classList.contains('zoomable')) openBox(img as HTMLImageElement);
+      });
+      box.addEventListener('click', closeBox);
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !box.hidden) closeBox();
+      });
+    }
+  }
+</script>

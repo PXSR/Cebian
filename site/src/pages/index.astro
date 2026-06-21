@@ -1,7 +1,55 @@
 ---
 // GitHub Pages 是纯静态托管，无法做服务端 301/302 跳转。
 // 这里用首屏绘制前同步执行的内联脚本即时跳转，避免可见的「Redirecting」中转页。
-// 按浏览器语言选择 zh / en；无 JS 时回退到 <noscript> 的 meta refresh。
+//
+// 语言决策顺序：① 用户显式选过的语言（localStorage，阶段 1 切换器写入）→
+// ② 协商浏览器 navigator.languages 完整优先级列表 → ③ 回退 DEFAULT_LOCALE。
+// 支持列表从 locales.config.mjs 注入，保持单一来源；无 JS 时回退 <noscript>。
+import { LOCALE_CODES, DEFAULT_LOCALE } from '../../locales.config.mjs';
+
+const SUPPORTED = JSON.stringify(LOCALE_CODES);
+const FALLBACK = JSON.stringify(DEFAULT_LOCALE);
+
+const redirectScript = `
+(function () {
+  var SUPPORTED = ${SUPPORTED};
+  var FALLBACK = ${FALLBACK};
+  function lower(s) { return String(s || '').toLowerCase(); }
+  function pick() {
+    // ① 用户显式选过的语言优先
+    try {
+      var saved = localStorage.getItem('cebian-lang');
+      if (saved && SUPPORTED.indexOf(saved) >= 0) return saved;
+    } catch (e) {}
+    // ② 协商浏览器语言优先级列表
+    var langs = (navigator.languages && navigator.languages.length)
+      ? navigator.languages : [navigator.language || ''];
+    for (var i = 0; i < langs.length; i++) {
+      var L = lower(langs[i]);
+      if (!L) continue;
+      // 精确支持匹配
+      for (var j = 0; j < SUPPORTED.length; j++) {
+        if (lower(SUPPORTED[j]) === L) return SUPPORTED[j];
+      }
+      // 中文按字形 / 地区归类
+      if (L.indexOf('zh') === 0) {
+        var tw = L.indexOf('hant') >= 0 || L.indexOf('-tw') >= 0 ||
+                 L.indexOf('-hk') >= 0 || L.indexOf('-mo') >= 0;
+        var want = tw ? 'zh-TW' : 'zh';
+        if (SUPPORTED.indexOf(want) >= 0) return want;
+      }
+      // 主语言前缀匹配（en-US -> en）
+      var primary = L.split('-')[0];
+      for (var k = 0; k < SUPPORTED.length; k++) {
+        if (lower(SUPPORTED[k]).split('-')[0] === primary) return SUPPORTED[k];
+      }
+    }
+    // ③ 回退默认
+    return FALLBACK;
+  }
+  location.replace('/' + pick() + '/');
+})();
+`;
 ---
 <!doctype html>
 <html lang="zh">
@@ -10,15 +58,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
     <title>Cebian</title>
-    <script is:inline>
-      (function () {
-        var lang = (navigator.language || 'zh').toLowerCase();
-        var target = lang.indexOf('zh') === 0 ? '/zh/' : '/en/';
-        location.replace(target);
-      })();
-    </script>
+    <script is:inline set:html={redirectScript} />
     <noscript>
-      <meta http-equiv="refresh" content="0; url=/zh/" />
+      <meta http-equiv="refresh" content={`0; url=/${DEFAULT_LOCALE}/`} />
     </noscript>
   </head>
   <body></body>

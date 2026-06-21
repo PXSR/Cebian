@@ -1,0 +1,93 @@
+---
+title: Slash Prompts
+description: 用斜杠唤起你自己的提示词库。
+group: guides
+order: 2
+---
+
+import Placeholder from '@/components/Placeholder.astro';
+import QA from '@/components/docs/QA.astro';
+import QAItem from '@/components/docs/QAItem.astro';
+
+Slash Prompt 是一组你自己写的提示词模板。平时输入消息时，只要先输入 `/`，就可以从列表里选一个模板填进输入框。
+
+它适合保存那些你经常重复写的要求，比如总结网页、翻译选中内容、整理会议记录、改写文案等。
+
+![截图](./input-box.png)
+
+## 创建 Prompt
+
+入口在「设置 → 提示词」。
+
+![截图](./snapshot.png)
+
+点击左侧的「新建文件」后，会创建一个 Markdown 文件。一个 Prompt 文件大致长这样：
+
+```md
+---
+name: summarize-page
+description: 总结当前页面
+---
+
+请阅读当前页面内容，用简洁的要点总结它。
+```
+
+其中：
+
+- `name` 是斜杠菜单里显示的名字
+- `description` 是一行说明，方便你之后区分
+- frontmatter 下面的正文，就是最终会填进输入框的内容
+
+普通使用的话，先写几个短模板就够了。等用顺手了，再慢慢整理成自己的提示词库。
+
+> 注意：文件名没有特别的意义，斜杠菜单里显示的名字是 frontmatter 里的 `name` 字段。你可以随时改 `name` 来调整菜单里的显示，而不必改文件名。
+
+## 在对话里使用
+
+回到对话输入框，输入 `/` 就会打开 Prompt 列表。
+
+你可以继续输入关键词筛选，选中后按回车，或者直接点击某一项。Cebian 会把 Prompt 内容填进输入框。
+
+填入后不会自动发送。你可以先改一下，再手动发送。
+
+## 模板变量
+
+Prompt 里可以写一些变量，触发时 Cebian 会替换成当前环境里的真实内容。
+
+| 变量 | 含义 |
+| --- | --- |
+| `{{selected_text}}` | 当前页面选中的文字 |
+| `{{page_url}}` | 当前页面 URL |
+| `{{page_title}}` | 当前页面标题 |
+| `{{date}}` | 当前日期 |
+| `{{clipboard}}` | 剪贴板内容 |
+
+比如：
+
+```md
+---
+name: translate-selection
+description: 翻译选中的内容
+---
+
+请把下面这段内容翻译成简体中文：
+
+{{selected_text}}
+```
+
+如果某个变量取不到内容，会被替换成空字符串；如果变量名写错了，会原样留在文本里。
+
+## 文件位置
+
+Prompt 文件保存在 VFS 里的 `~/.cebian/prompts/`。
+
+你一般不用手动打开这个路径，直接在「设置 → 提示词」里编辑就行。备份时选择「技能与提示词」，这些文件也会一起备份。
+
+## Q&A
+
+<QA>
+	<QAItem q="输入 / 没有看到列表怎么办？">先去「设置 → 提示词」创建一个 Prompt。</QAItem>
+	<QAItem q="选中 Prompt 后没有自动发送？">这是正常的。Cebian 只会帮你填入输入框，你可以先改，再手动发送。</QAItem>
+	<QAItem q="页面变量为空怎么办？">当前页面可能不允许读取，或者你没有选中文字。</QAItem>
+	<QAItem q="Prompt 太长不好维护怎么办？">可以拆成几个更短的模板，用的时候再补充具体要求。</QAItem>
+</QA>

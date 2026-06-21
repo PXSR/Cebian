@@ -8,5 +8,6 @@
       "@/*": ["./*"],
       "#i18n": ["./.wxt/i18n/index.ts"]
     }
-  }
+  },
+  "exclude": ["site", ".output", "node_modules"]
 }

@@ -1,0 +1,135 @@
+---
+import { getDict, type Lang } from '../../lib/i18n';
+interface Props { lang: Lang; }
+const { lang } = Astro.props;
+const t = getDict(lang);
+const ins = t.home.install;
+
+const GH_RELEASE = 'https://github.com/maotoumao/Cebian/releases/latest';
+const CHROME_STORE = 'https://chromewebstore.google.com/detail/dnfmklmdbipiahdjiogaoemjaiodomdf';
+const EDGE_STORE = 'https://microsoftedge.microsoft.com/addons/detail/kakfgcmbiacmclkjboijakkhlhioopcd';
+---
+<section class="section wrap" id="install">
+  <div class="install">
+    <div class="install-head">
+      <h2>{ins.heading}</h2>
+      <p>{ins.lead}</p>
+    </div>
+
+    <div class="install-grid">
+      <!-- GitHub Release (featured, with steps) -->
+      <a class="opt opt-featured" data-browser="other" href={GH_RELEASE} target="_blank" rel="noopener">
+        <span class="opt-ic">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6a4.7 4.7 0 0 1 1.2-3.2c-.1-.3-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.7 1.6.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.7-2.8 5.7-5.5 6 .5.4.8 1.1.8 2.2v3.2c0 .3.2.7.8.6A12 12 0 0 0 12 .3Z"/></svg>
+        </span>
+        <span class="opt-body">
+          <span class="opt-title">{ins.options.github.title}<span class="badge">{ins.latestBadge}</span></span>
+          <span class="opt-desc">{ins.options.github.desc}</span>
+          <span class="opt-steps">
+            <ol>
+              {ins.steps.map((step, i) => (
+                <li class="step"><span class="n mono">{i + 1}</span>{step}</li>
+              ))}
+            </ol>
+          </span>
+        </span>
+      </a>
+
+      <!-- Chrome -->
+      <a class="opt" data-browser="chrome" href={CHROME_STORE} target="_blank" rel="noopener">
+        <span class="opt-ic">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C8.21 0 4.831 1.757 2.632 4.501l3.953 6.848A5.454 5.454 0 0 1 12 6.545h10.691A12 12 0 0 0 12 0zM1.931 5.47A11.943 11.943 0 0 0 0 12c0 6.012 4.42 10.991 10.189 11.864l3.953-6.847a5.45 5.45 0 0 1-6.865-2.29zm13.342 2.166a5.446 5.446 0 0 1 1.45 7.09l.002.001h-.002l-5.344 9.257c.206.01.413.016.621.016 6.627 0 12-5.373 12-12 0-1.54-.29-3.011-.818-4.364zM12 16.364a4.364 4.364 0 1 1 0-8.728 4.364 4.364 0 0 1 0 8.728Z"/></svg>
+        </span>
+        <span class="opt-body">
+          <span class="opt-title">{ins.options.chrome.title}</span>
+          <span class="opt-desc">{ins.options.chrome.desc}</span>
+          <span class="opt-go">{ins.goCta}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg></span>
+        </span>
+      </a>
+
+      <!-- Edge -->
+      <a class="opt" data-browser="edge" href={EDGE_STORE} target="_blank" rel="noopener">
+        <span class="opt-ic">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.86 17.86q.14 0 .25.12.1.13.1.25t-.11.33l-.32.46-.43.53-.44.5q-.21.25-.38.42l-.22.23q-.58.53-1.34 1.04-.76.51-1.6.91-.86.4-1.74.64t-1.67.24q-.9 0-1.69-.28-.8-.28-1.48-.78-.68-.5-1.22-1.17-.53-.66-.92-1.44-.38-.77-.58-1.6-.2-.83-.2-1.67 0-1 .32-1.96.33-.97.87-1.8.14.95.55 1.77.41.82 1.02 1.5.6.68 1.38 1.21.78.54 1.64.9.86.36 1.77.56.92.2 1.8.2 1.12 0 2.18-.24 1.06-.23 2.06-.72l.2-.1.2-.05zm-15.5-1.27q0 1.1.27 2.15.27 1.06.78 2.03.51.96 1.24 1.77.74.82 1.66 1.4-1.47-.2-2.8-.74-1.33-.55-2.48-1.37-1.15-.83-2.08-1.9-.92-1.07-1.58-2.33T.36 14.94Q0 13.54 0 12.06q0-.81.32-1.49.31-.68.83-1.23.53-.55 1.2-.96.66-.4 1.35-.66.74-.27 1.5-.39.78-.12 1.55-.12.7 0 1.42.1.72.12 1.4.35.68.23 1.32.57.63.35 1.16.83-.35 0-.7.07-.33.07-.65.23v-.02q-.63.28-1.2.74-.57.46-1.05 1.04-.48.58-.87 1.26-.38.67-.65 1.39-.27.71-.42 1.44-.15.72-.15 1.38zM11.96.06q1.7 0 3.33.39 1.63.38 3.07 1.15 1.43.77 2.62 1.93 1.18 1.16 1.98 2.7.49.94.76 1.96.28 1 .28 2.08 0 .89-.23 1.7-.24.8-.69 1.48-.45.68-1.1 1.22-.64.53-1.45.88-.54.24-1.11.36-.58.13-1.16.13-.42 0-.97-.03-.54-.03-1.1-.12-.55-.1-1.05-.28-.5-.19-.84-.5-.12-.09-.23-.24-.1-.16-.1-.33 0-.15.16-.35.16-.2.35-.5.2-.28.36-.68.16-.4.16-.95 0-1.06-.4-1.96-.4-.91-1.06-1.64-.66-.74-1.52-1.28-.86-.55-1.79-.89-.84-.3-1.72-.44-.87-.14-1.76-.14-1.55 0-3.06.45T.94 7.55q.71-1.74 1.81-3.13 1.1-1.38 2.52-2.35Q6.68 1.1 8.37.58q1.7-.52 3.58-.52Z"/></svg>
+        </span>
+        <span class="opt-body">
+          <span class="opt-title">{ins.options.edge.title}</span>
+          <span class="opt-desc">{ins.options.edge.desc}</span>
+          <span class="opt-go">{ins.goCta}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg></span>
+        </span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .install {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--line-2); border-radius: var(--radius-lg);
+    background:
+      radial-gradient(70% 120% at 92% 0%, var(--accent-wash), transparent 55%),
+      var(--surface);
+    padding: clamp(32px, 4vw, 52px);
+  }
+  .install-head h2 { font-size: clamp(28px, 3.6vw, 40px); font-weight: 800; letter-spacing: -0.035em; }
+  .install-head p { margin-top: 14px; font-size: 16.5px; color: var(--ink-muted); max-width: 52ch; }
+
+  .install-grid { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .opt {
+    display: flex; gap: 15px; align-items: flex-start; padding: 22px;
+    border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg);
+    transition: border-color .15s, transform .15s var(--ease);
+  }
+  .opt:hover { border-color: var(--ink-subtle); transform: translateY(-2px); }
+  .opt-ic { width: 38px; height: 38px; flex: none; display: grid; place-items: center; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface); color: var(--ink); }
+  .opt-ic svg { width: 20px; height: 20px; }
+  .opt-body { display: flex; flex-direction: column; min-width: 0; }
+  .opt-title { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .opt-desc { margin-top: 4px; font-size: 13.5px; color: var(--ink-muted); line-height: 1.5; }
+  .opt-go { margin-top: 10px; font-size: 13px; font-weight: 600; color: var(--accent); display: inline-flex; align-items: center; gap: 5px; }
+  .opt-go svg { width: 13px; height: 13px; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.01em; line-height: 1;
+    color: var(--accent-strong);
+    background: color-mix(in srgb, var(--accent-fill) 22%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--accent-fill) 45%, transparent);
+    border-radius: 999px; padding: 3px 9px 3px 7px;
+  }
+  .badge::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent-fill); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-fill) 30%, transparent);
+  }
+
+  /* GitHub featured: spans both columns, amber-tinted. The icon box keeps the
+     same neutral white treatment as Chrome/Edge for a calm, consistent row. */
+  .opt-featured { grid-column: 1 / -1; border-color: var(--accent-line); background: var(--accent-wash); }
+  .opt-steps { margin-top: 14px; }
+  .opt-steps ol { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; padding: 0; }
+  .opt-steps .step { font-size: 12.5px; color: var(--ink-muted); display: inline-flex; align-items: center; gap: 7px; }
+  .opt-steps .n { width: 18px; height: 18px; display: grid; place-items: center; border: 1px solid var(--accent-line); border-radius: 5px; font-size: 10.5px; color: var(--accent); }
+
+  /* primary highlight (applied to whichever option matches the user's browser) */
+  .opt.is-primary { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+  @media (max-width: 760px) {
+    .install-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<script>
+  // 按浏览器把对应安装入口高亮为「主」选项。顺序不变，仅加视觉强调。
+  // 仅在桌面 Chromium / Edge 上提升商店入口；移动端（扩展安装路径不适用）
+  // 保持 GitHub 默认。Edge UA 同时含 "edg" 与 "chrome"，故先判 Edge。
+  const ua = navigator.userAgent.toLowerCase();
+  const isMobile = /android|iphone|ipad|ipod|mobile|crios|edgios|edga|fxios/.test(ua);
+  let target: 'edge' | 'chrome' | 'other' = 'other';
+  if (!isMobile) {
+    if (ua.includes('edg/')) target = 'edge';
+    else if (ua.includes('chrome') || ua.includes('chromium')) target = 'chrome';
+  }
+
+  const el = document.querySelector(`.opt[data-browser="${target}"]`);
+  el?.classList.add('is-primary');
+</script>

@@ -1,0 +1,41 @@
+---
+// MDX 里可用的提示框。用法：<Callout type="tip">内容</Callout>
+// type: tip(默认) | warn | note
+// label：给辅助技术的类型标注（视觉隐藏）。作者可覆盖；缺省按 type 取一个通用词。
+interface Props {
+  type?: 'tip' | 'warn' | 'note';
+  label?: string;
+}
+const { type = 'tip', label } = Astro.props;
+const defaultLabel = { tip: 'Tip', warn: 'Warning', note: 'Note' }[type];
+const srLabel = label ?? defaultLabel;
+const icon = {
+  tip: 'M9 18h6M10 21h4M12 2a7 7 0 0 1 4 12.7c-.6.5-1 1.2-1 2H9c0-.8-.4-1.5-1-2A7 7 0 0 1 12 2Z',
+  warn: 'M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z',
+  note: 'M12 16v-4M12 8h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z',
+}[type];
+---
+<aside class:list={['callout', `callout-${type}`]} role="note">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={icon}/></svg>
+  <div class="callout-body">
+    <span class="sr-only">{srLabel}: </span>
+    <slot />
+  </div>
+</aside>
+
+<style>
+  .callout {
+    display: flex; gap: 12px; align-items: flex-start;
+    margin: 22px 0; padding: 15px 17px;
+    border: 1px solid var(--accent-line); border-radius: var(--radius);
+    background: var(--accent-wash);
+  }
+  .callout > svg { width: 19px; height: 19px; flex: none; margin-top: 2px; color: var(--accent); }
+  .callout-body { font-size: 15px; line-height: 1.6; color: var(--ink); }
+  .callout-body :global(:first-child) { margin-top: 0; }
+  .callout-body :global(:last-child) { margin-bottom: 0; }
+  .callout-body :global(p) { margin: 0; }
+  .callout-warn { border-color: color-mix(in srgb, #c2632c 40%, var(--line-2)); background: color-mix(in srgb, #c2632c 8%, var(--surface)); }
+  .callout-warn > svg { color: #b5551f; }
+  :global([data-theme="dark"]) .callout-warn > svg { color: #e08a4f; }
+</style>
