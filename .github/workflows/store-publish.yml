@@ -61,7 +61,7 @@ jobs:
           ls -la dist
 
       - name: Upload zip for store jobs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: store-chrome-zip
           path: dist/extension.zip
@@ -75,7 +75,7 @@ jobs:
     environment: store-publish # 审批门 + 商店密钥(Chrome 与 Edge 共用同一环境)
     steps:
       - name: Download chrome zip
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: store-chrome-zip
           path: dist
@@ -98,7 +98,7 @@ jobs:
     environment: store-publish # 审批门 + 商店密钥(Chrome 与 Edge 共用同一环境)
     steps:
       - name: Download chrome zip
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: store-chrome-zip
           path: dist

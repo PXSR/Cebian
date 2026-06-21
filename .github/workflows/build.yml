@@ -25,7 +25,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -33,9 +33,9 @@ jobs:
           version: 9
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -58,14 +58,14 @@ jobs:
           fi
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: cebian-${{ matrix.browser }}-build
           path: .output/${{ matrix.browser == 'firefox' && 'firefox-mv2' || 'chrome-mv3' }}/
           retention-days: 30
 
       - name: Upload zip artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: cebian-${{ matrix.browser }}-zip
           path: .output/*-${{ matrix.browser }}.zip
@@ -75,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Package each skill directory
         run: |
@@ -88,7 +88,7 @@ jobs:
           ls -la dist/skills
 
       - name: Upload skills zip artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: cebian-skills-zip
           path: dist/skills/*.zip
