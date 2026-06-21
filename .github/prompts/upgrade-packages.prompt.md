@@ -17,6 +17,7 @@ tools: ['search', 'fetch', 'runCommands', 'web']
 - 在终端运行 `pnpm outdated`（项目用 pnpm，不要用 npm/yarn）拿到「Current / Wanted / Latest」三列。
 - 如果我在参数里指定了具体库名，只处理这些库；否则处理全部有可升级版本的库。
 - 已经是最新版的库直接跳过，不必逐个写说明。
+- 不要更新typescript版本。
 
 ### 2. 逐库深入调研
 对每个「有更新」的库，调研已安装版本 → 最新版本之间发生了什么：
