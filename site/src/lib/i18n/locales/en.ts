@@ -180,4 +180,9 @@ export const en: Dict = {
       privacy: 'Privacy',
     },
   },
+  consent: {
+    message: 'This site uses cookies for anonymous analytics to help improve it. You can accept or decline.',
+    accept: 'Accept',
+    reject: 'Decline',
+  },
 };

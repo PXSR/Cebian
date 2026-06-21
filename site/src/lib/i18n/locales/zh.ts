@@ -180,4 +180,9 @@ export const zh: Dict = {
       privacy: '隐私声明',
     },
   },
+  consent: {
+    message: '本站使用 Cookie 进行匿名访问统计，帮助改进站点。你可以选择接受或拒绝。',
+    accept: '接受',
+    reject: '拒绝',
+  },
 };

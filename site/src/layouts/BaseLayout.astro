@@ -3,6 +3,7 @@
 import BaseHead from '../components/BaseHead.astro';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
+import ConsentBanner from '../components/ConsentBanner.astro';
 import { LOCALES, type Lang } from '../lib/i18n';
 
 interface Props {
@@ -30,5 +31,6 @@ const htmlLang = LOCALES[lang].htmlLang;
       <slot />
     </main>
     {!bare && <Footer lang={lang} />}
+    <ConsentBanner lang={lang} />
   </body>
 </html>

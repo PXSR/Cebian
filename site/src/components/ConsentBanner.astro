@@ -1,0 +1,72 @@
+---
+// Cookie / 分析同意横幅（GDPR/ePrivacy）：未做选择时显示，接受 / 拒绝写入
+// localStorage('cebian-consent')。GA 默认以拒绝（cookieless）模式运行，接受后
+// 通过 gtag('consent','update') 升级为完整模式。仅生产构建注入（与 GA 一致）。
+import { getDict, type Lang } from '../lib/i18n';
+
+interface Props { lang: Lang; }
+const { lang } = Astro.props;
+const t = getDict(lang);
+---
+{import.meta.env.PROD && (
+  <div class="consent" id="consent-banner" hidden role="dialog" aria-live="polite" aria-label={t.consent.message}>
+    <p class="consent-text">{t.consent.message}</p>
+    <div class="consent-actions">
+      <button type="button" class="consent-btn consent-reject" id="consent-reject">{t.consent.reject}</button>
+      <button type="button" class="consent-btn consent-accept" id="consent-accept">{t.consent.accept}</button>
+    </div>
+  </div>
+)}
+
+<style>
+  .consent {
+    position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: var(--z-toast, 9999);
+    margin-inline: auto; max-width: 560px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 14px 16px; border-radius: 12px;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: saturate(140%) blur(14px);
+    border: 1px solid var(--line-2);
+    box-shadow: 0 8px 32px -12px rgba(24, 24, 27, 0.3);
+  }
+  /* 作者写了 display:flex，会盖过浏览器对 [hidden] 的默认隐藏，需显式置 none。 */
+  .consent[hidden] { display: none; }
+  [data-theme="dark"] .consent { box-shadow: 0 8px 32px -10px rgba(0, 0, 0, 0.6); }
+  .consent-text { flex: 1 1 240px; font-size: 13px; line-height: 1.55; color: var(--ink-muted); margin: 0; }
+  .consent-actions { display: flex; gap: 8px; flex: none; }
+  .consent-btn {
+    font-size: 13px; padding: 7px 14px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--line-2); background: var(--surface); color: var(--ink-muted);
+    transition: color .15s, border-color .15s, background .15s;
+  }
+  .consent-btn:hover { color: var(--ink); border-color: var(--ink-subtle); }
+  .consent-accept { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .consent-accept:hover { color: #fff; filter: brightness(1.06); }
+  @media (max-width: 480px) {
+    .consent-actions { width: 100%; }
+    .consent-btn { flex: 1; }
+  }
+</style>
+
+<script>
+  // 仅在用户尚未选择时显示横幅；接受 / 拒绝后写入并即时通知 GA Consent Mode。
+  const KEY = 'cebian-consent';
+  const banner = document.getElementById('consent-banner');
+  if (banner) {
+    let choice: string | null = null;
+    try { choice = localStorage.getItem(KEY); } catch {}
+    if (choice !== 'granted' && choice !== 'denied') banner.removeAttribute('hidden');
+
+    const win = window as unknown as { dataLayer?: IArguments[] };
+    win.dataLayer = win.dataLayer || [];
+    // 与 BaseHead 的 gtag stub 一致：push 真正的 arguments 对象，gtag.js 才能识别。
+    function gtag() { win.dataLayer!.push(arguments); }
+    const decide = (granted: boolean) => {
+      try { localStorage.setItem(KEY, granted ? 'granted' : 'denied'); } catch {}
+      gtag('consent', 'update', { analytics_storage: granted ? 'granted' : 'denied' });
+      banner.setAttribute('hidden', '');
+    };
+    document.getElementById('consent-accept')?.addEventListener('click', () => decide(true));
+    document.getElementById('consent-reject')?.addEventListener('click', () => decide(false));
+  }
+</script>

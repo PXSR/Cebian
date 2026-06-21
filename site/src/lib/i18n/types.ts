@@ -146,4 +146,10 @@ export interface Dict {
     linksHeading: string;
     links: { repo: string; releases: string; sponsor: string; privacy: string };
   };
+  /** Cookie / 分析同意横幅 */
+  consent: {
+    message: string;
+    accept: string;
+    reject: string;
+  };
 }
