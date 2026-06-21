@@ -27,13 +27,27 @@ pnpm run build        # 生产构建
 省去在 UI 里手动走一遍配置流程。这段逻辑只在 dev 模式且 API key 非空时执行，
 生产构建完全跳过；如果同 id 的 provider 已存在，也不会被覆盖。
 
+## 提交 PR 之前
+
+为了确保实现方向与项目目标一致，**PR 必须绑定一个已获维护者批准的 issue**。
+流程如下：
+
+1. **新建或找到一个 issue**，描述要修的 bug 或要做的功能，并在其中讨论你的方案。
+2. **等待批准**。维护者会在该 issue 单独回复一条内容完全为 `/ready` 的评论，
+   从而打上 `ready-to-implement` 标签，表示方案已达成共识、可以开始实现。
+3. **再提交 PR**，并在描述里用 `Closes #<issue 编号>` 关联该 issue。
+
+**未绑定**带 `ready-to-implement` 标签 issue 的 PR 会被机器人**自动关闭**，并附上
+说明如何继续的评论。不用担心——等关联的 issue 获批后，重新打开（reopen）这个 PR
+即可通过检查。维护者和协作者发起的 PR 不受此闸门限制。
+
 ## 贡献流程
 
 1. Fork 本仓库，并从 `master` 创建你的分支。
 2. 进行修改。保持每个 commit 聚焦，diff 尽量精简。
 3. 推送前在本地运行 `pnpm run check`。
-4. 向 `master` 发起 Pull Request，并在 PR 模板中勾选 CLA 选项以表示
-   同意贡献者许可协议。
+4. 向 `master` 发起 Pull Request，在描述里用 `Closes #<issue 编号>` 关联已获批的
+   issue，并在 PR 模板中勾选 CLA 选项以表示同意贡献者许可协议。
 
 ## 贡献者许可协议（CLA）
 

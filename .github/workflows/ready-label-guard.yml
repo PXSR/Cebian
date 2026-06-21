@@ -1,0 +1,56 @@
+name: Ready Label Guard
+
+# 兜底：只有维护者能授予 ready-to-implement 标签。任何其他人（包括有 Triage/Write
+# 权限、可在 UI 手动加标签的协作者）一旦加上该标签，立即静默撤销（不发评论）。
+# Backstop: only the maintainer may grant ready-to-implement. If anyone else
+# (including collaborators who can add labels from the UI) applies it, silently revoke.
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: write
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Revoke unauthorized ready label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // ---- 配置 / Config ----
+            const MAINTAINER = 'maotoumao';
+            const READY_LABEL = 'ready-to-implement';
+            // /ready workflow 用 GITHUB_TOKEN 打标签时不会触发本工作流（GitHub 防递归），
+            // 但万一标签来自机器人路径，也一并放行，避免误撤。
+            // Bot-applied labels are allow-listed in case they ever reach this guard.
+            const ALLOWED = [MAINTAINER, 'github-actions[bot]'];
+
+            const labelName = context.payload.label && context.payload.label.name;
+            if (labelName !== READY_LABEL) return;
+
+            const actor = context.actor;
+            if (ALLOWED.includes(actor)) {
+              core.info(`Authorized actor applied ${READY_LABEL}: ${actor}`);
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.issue.number;
+
+            // 撤销标签（静默）。标签可能已被并发移除，404 视为已完成。
+            // Silently remove the label (no comment). Tolerate a 404 if already removed.
+            try {
+              await github.rest.issues.removeLabel({
+                owner,
+                repo,
+                issue_number,
+                name: READY_LABEL,
+              });
+            } catch (err) {
+              if (err.status !== 404) throw err;
+            }
+
+            core.info(`Revoked ${READY_LABEL} added by unauthorized actor: ${actor}`);

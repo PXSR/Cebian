@@ -1,0 +1,139 @@
+name: PR Issue Gate
+
+# PR 准入闸门：未由维护者/协作者发起、且未绑定带 ready-to-implement 标签 issue 的
+# PR 会被自动关闭并留言说明。用 pull_request_target 以便对 fork PR 也有写权限；
+# 本工作流只走 GitHub API、不检出 PR 代码，无代码注入风险。
+# Auto-close PRs that aren't from maintainers/collaborators and aren't tied to a
+# ready-to-implement issue. Uses pull_request_target for write access on forks;
+# it never checks out PR code, only calls the API — no code-injection surface.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, edited]
+
+permissions:
+  pull-requests: write
+  issues: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce ready-to-implement gate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // ---- 配置 / Config ----
+            const READY_LABEL = 'ready-to-implement';
+            // 这些关联级别的作者可绕过闸门（sign-off）。
+            // Authors with these associations bypass the gate (sign-off).
+            const BYPASS_ASSOCIATIONS = ['OWNER', 'MEMBER', 'COLLABORATOR'];
+            // 额外的登录名白名单（如需放行特定外部贡献者）。
+            // Extra login allow-list for specific external contributors.
+            const BYPASS_LOGINS = [];
+
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            const prNumber = pr.number;
+            const author = pr.user.login;
+            const association = pr.author_association;
+
+            // edited 事件可能来自已关闭的 PR；只处理 open 状态，避免重复操作。
+            // edited can fire on an already-closed PR; only act on open ones.
+            if (pr.state !== 'open') {
+              core.info(`Skip: PR #${prNumber} is ${pr.state}`);
+              return;
+            }
+
+            // 1. sign-off 豁免：维护者/协作者或白名单作者直接放行。
+            // Sign-off bypass: maintainers/collaborators or allow-listed authors pass.
+            if (BYPASS_ASSOCIATIONS.includes(association) || BYPASS_LOGINS.includes(author)) {
+              core.info(`Bypass: ${author} (${association})`);
+              return;
+            }
+
+            // 2. 取 PR 通过 Closes/Fixes/Resolves #N 正式绑定的 issue。
+            // Fetch issues formally linked via Closes/Fixes/Resolves #N.
+            const query = `
+              query($owner: String!, $repo: String!, $pr: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequest(number: $pr) {
+                    closingIssuesReferences(first: 50) {
+                      nodes {
+                        number
+                        labels(first: 100) { nodes { name } }
+                      }
+                    }
+                  }
+                }
+              }`;
+            const result = await github.graphql(query, { owner, repo, pr: prNumber });
+            const linkedIssues =
+              result.repository.pullRequest.closingIssuesReferences.nodes || [];
+
+            // 3. 任意绑定的 issue 带 ready-to-implement 标签即放行。
+            // Pass if any linked issue carries the ready-to-implement label.
+            const approvedIssue = linkedIssues.find((issue) =>
+              (issue.labels.nodes || []).some((l) => l.name === READY_LABEL),
+            );
+            if (approvedIssue) {
+              core.info(`Gate passed via issue #${approvedIssue.number}`);
+              return;
+            }
+
+            // 4. 未通过：友好留言 + 关闭 PR。留言带隐藏标记，重复 reopen/edit 不重复发。
+            // Not allowed: comment (with a hidden marker for idempotency) and close.
+            const GATE_MARKER = '<!-- pr-issue-gate -->';
+
+            const existing = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: prNumber,
+              per_page: 100,
+            });
+            const alreadyCommented = existing.some(
+              (c) => c.body && c.body.includes(GATE_MARKER),
+            );
+
+            if (!alreadyCommented) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: [
+                  GATE_MARKER,
+                `👋 感谢你的贡献！不过这个 PR 暂时被系统自动关闭了。`,
+                ``,
+                `本项目要求：每个 PR 必须关联一个**经过维护者批准**的 issue（带 \`${READY_LABEL}\` 标签），这样才能确保在动手写代码之前，实现方向已经达成共识。`,
+                ``,
+                `**怎样让这个 PR 被接受：**`,
+                `1. 先去对应的 issue 里讨论你的方案；`,
+                `2. 等维护者在该 issue 下回复 \`/ready\`，给 issue 打上 \`${READY_LABEL}\` 标签；`,
+                `3. 确保你的 PR 描述里写了 \`Closes #\`；`,
+                `4. 重新打开这个 PR，系统会再次检查，通过后就会自动放行（合并）。`,
+                ``,
+                `如果你觉得这是误判，欢迎在评论区告诉我们。`,
+                ``,
+                `---`,
+                ``,
+                `👋 Thanks for contributing! This PR was auto-closed for now.`,
+                ``,
+                `This project requires every PR to reference an issue that has been **approved by the maintainer** (carrying the \`${READY_LABEL}\` label), so that the approach is agreed upon before implementation.`,
+                ``,
+                `**How to get it accepted:**`,
+                `1. Discuss your approach in the related issue first;`,
+                `2. Wait for the maintainer to reply \`/ready\` and apply the \`${READY_LABEL}\` label;`,
+                `3. Make sure your PR description includes \`Closes #<issue number>\`;`,
+                `4. Reopen this PR — the gate will re-check and let it through.`,
+                ``,
+                  `If you believe this was a mistake, feel free to comment.`,
+                ].join('\n'),
+              });
+            }
+
+            await github.rest.pulls.update({
+              owner,
+              repo,
+              pull_number: prNumber,
+              state: 'closed',
+            });
