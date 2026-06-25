@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Key, MessageSquare, FileText, Blocks, Plug, Info, DatabaseBackup } from 'lucide-react';
+import { Key, MessageSquare, FileText, Blocks, Plug, Info, DatabaseBackup, HardDrive } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 
@@ -22,6 +22,7 @@ export const SETTINGS_SECTIONS: SectionNavItem[] = [
   { path: 'skills', getLabel: () => t('settings.nav.skills'), icon: Blocks },
   { path: 'mcp', getLabel: () => t('settings.nav.mcp'), icon: Plug },
   { path: 'backup', getLabel: () => t('settings.nav.backup'), icon: DatabaseBackup },
+  { path: 'storage', getLabel: () => t('settings.nav.storage'), icon: HardDrive },
   // 高级设置暂时停用：原本的「最大对话轮数」已被上下文压缩机制取代，目前没有
   // 可调项。待接入压缩参数等新设置后再恢复此入口（路由见 settings/index.tsx）。
   // { path: 'advanced', getLabel: () => t('settings.nav.advanced'), icon: Sliders },

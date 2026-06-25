@@ -103,6 +103,33 @@ export async function listSessions(): Promise<SessionRecord[]> {
   return db.sessions.orderBy('updatedAt').reverse().toArray();
 }
 
+/** {@link getSessionLabels} 返回的轻量投影：只含把工作区 UUID 翻译成人类标签所需的
+ *  字段（标题 + 时间），不带 messages，调用方拿去渲染目录列表 / 头部信息条即可。 */
+export interface SessionLabelRow {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * 按 id 批量取会话的标签字段（标题 + 时间）。供 VFS 浏览器把 `/workspaces/<uuid>/`
+ * 目录翻译成「会话标题 · 日期」用——一次查询解析一屏 UUID，避免逐目录查库。
+ *
+ * 注意：Dexie 会先把命中的整行（含 messages）载入内存再投影，这是一次性的 browse
+ * 动作、非热路径，故可接受。查不到的 id 不出现在结果里，由调用方回落为「未知会话」。
+ */
+export async function getSessionLabels(ids: string[]): Promise<SessionLabelRow[]> {
+  if (ids.length === 0) return [];
+  const rows = await db.sessions.where('id').anyOf(ids).toArray();
+  return rows.map((s) => ({
+    id: s.id,
+    title: s.title,
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
+  }));
+}
+
 export async function updateSessionMessages(
   id: string,
   messages: AgentMessage[],

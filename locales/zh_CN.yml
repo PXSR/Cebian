@@ -81,10 +81,17 @@ settings:
     skills: "技能"
     mcp: "MCP 服务器"
     backup: "备份与恢复"
+    storage: "文件系统"
     advanced: "高级"
     about: "关于"
   providers:
     title: "AI 提供商"
+  storage:
+    title: "文件系统"
+    used: "已用空间"
+    usedError: "无法计算"
+    openBrowser: "打开文件浏览器"
+    description: "按会话浏览 AI 生成的文件。浏览器是只读的，需要导出时用其中的下载按钮。"
   about:
     title: "关于"
     tagline: "AI 浏览器侧边栏助手"
@@ -658,6 +665,11 @@ vfs:
   # $1 = 路径
   pathNotFound: "路径不存在：$1"
   unknownError: "未知错误"
+  # 工作区目录还在、但对应会话已被删除。$1 = 短 id
+  unknownSession: "未知会话 · $1"
+  untitledSession: "未命名会话"
+  # $1 = 格式化后的日期
+  workspaceCreated: "创建于 $1"
 
 # ─── 独立授权页（entrypoints/user-permission）───
 permission:

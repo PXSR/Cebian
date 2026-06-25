@@ -1,5 +1,6 @@
 import { File, FileCode, FileText, type LucideIcon } from 'lucide-react';
 import { normalizePath } from '@/lib/persistence/vfs';
+import { WORKSPACES_ROOT } from '@/lib/persistence/vfs-paths';
 
 /** Extensions that the loader treats as binary (no inline preview, no utf8
  *  read). Some media extensions (e.g. `png`, `mp4`) also appear here as a
@@ -54,6 +55,18 @@ export function parentOf(p: string): string {
   if (p === '/') return '/';
   const idx = p.lastIndexOf('/');
   return idx <= 0 ? '/' : p.slice(0, idx);
+}
+
+/** 当前路径是否正好是工作区根 `/workspaces`——此时目录列表的子项都是会话 UUID，
+ *  需要翻译成「会话标题 · 日期」。 */
+export function isWorkspacesRoot(p: string): boolean {
+  return p === WORKSPACES_ROOT;
+}
+
+/** 若 `p` 正好是某个会话工作区目录（`/workspaces/<uuid>`，父目录正好是工作区根），
+ *  返回该 `<uuid>` 段，用于解析头部信息条；否则返回 null（更深的子目录不算）。 */
+export function workspaceUuidOf(p: string): string | null {
+  return parentOf(p) === WORKSPACES_ROOT ? (p.split('/').pop() ?? null) : null;
 }
 
 export function formatSize(bytes: number): string {

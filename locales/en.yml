@@ -85,10 +85,17 @@ settings:
     skills: "Skills"
     mcp: "MCP Servers"
     backup: "Backup & Restore"
+    storage: "Filesystem"
     advanced: "Advanced"
     about: "About"
   providers:
     title: "AI providers"
+  storage:
+    title: "Filesystem"
+    used: "Used space"
+    usedError: "Couldn't calculate"
+    openBrowser: "Open file browser"
+    description: "Browse files the AI created, organized by conversation. The browser is read-only — use the download button there to export."
   about:
     title: "About"
     tagline: "AI browser sidebar assistant"
@@ -670,6 +677,11 @@ vfs:
   # $1 = path
   pathNotFound: "Path not found: $1"
   unknownError: "Unknown error"
+  # Session whose workspace dir survives but the session itself was deleted. $1 = short id
+  unknownSession: "Unknown conversation · $1"
+  untitledSession: "Untitled conversation"
+  # $1 = formatted date
+  workspaceCreated: "Created $1"
 
 # ─── Standalone user-permission page (entrypoints/user-permission) ───
 permission:

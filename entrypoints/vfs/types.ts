@@ -1,3 +1,5 @@
+import type { SessionLabelRow } from '@/lib/persistence/db';
+
 export interface DirEntry {
   name: string;
   isDir: boolean;
@@ -20,6 +22,17 @@ export type FileMedia =
 
 export type ViewState =
   | { kind: 'loading' }
-  | { kind: 'dir'; path: string; entries: DirEntry[] }
+  | {
+      kind: 'dir';
+      path: string;
+      entries: DirEntry[];
+      /** 仅当 `path` 正好是 `/workspaces` 时存在：`uuid → 会话标签行`，DirView 据此把
+       *  UUID 子目录渲染成「会话标题 · 日期」并按最后活动倒序排。查不到的 UUID 不在 map 里。 */
+      workspaceLabels?: Map<string, SessionLabelRow>;
+      /** 仅当 `path` 正好是某个会话工作区目录且会话仍存在时存在：该会话的标签行，
+       *  DirView 据此渲染顶部信息条。 */
+      workspaceRow?: SessionLabelRow;
+    }
   | { kind: 'file'; path: string; media: FileMedia }
   | { kind: 'error'; path: string; message: string };
+

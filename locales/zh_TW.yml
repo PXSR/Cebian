@@ -81,10 +81,17 @@ settings:
     skills: "技能"
     mcp: "MCP 伺服器"
     backup: "備份與復原"
+    storage: "檔案系統"
     advanced: "進階"
     about: "關於"
   providers:
     title: "AI 供應商"
+  storage:
+    title: "檔案系統"
+    used: "已用空間"
+    usedError: "無法計算"
+    openBrowser: "開啟檔案瀏覽器"
+    description: "按對話瀏覽 AI 產生的檔案。瀏覽器是唯讀的，需要匯出時用其中的下載按鈕。"
   about:
     title: "關於"
     tagline: "AI 瀏覽器側邊欄助手"
@@ -657,6 +664,11 @@ vfs:
   # $1 = 路徑
   pathNotFound: "路徑不存在：$1"
   unknownError: "未知錯誤"
+  # 工作區目錄還在、但對應對話已被刪除。$1 = 短 id
+  unknownSession: "未知對話 · $1"
+  untitledSession: "未命名對話"
+  # $1 = 格式化後的日期
+  workspaceCreated: "建立於 $1"
 
 # ─── 獨立授權頁（entrypoints/user-permission）───
 permission:

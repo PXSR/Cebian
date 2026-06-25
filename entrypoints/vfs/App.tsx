@@ -9,9 +9,10 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 import { t } from '@/lib/i18n';
 import { applyTheme, resolveTheme } from './lib/theme';
-import { MAX_PREVIEW_BYTES, classifyFile, fileExtension, getHashPath, navigateTo } from './lib/path-utils';
+import { MAX_PREVIEW_BYTES, classifyFile, fileExtension, getHashPath, isWorkspacesRoot, navigateTo, workspaceUuidOf } from './lib/path-utils';
 import { mimeFor } from '@/lib/content/mime';
 import { zipDirectory, zipNameFor } from './lib/download';
+import { resolveWorkspaceLabels } from './lib/session-labels';
 import { Breadcrumbs } from './ui/Breadcrumbs';
 import { DirView } from './ui/DirView';
 import { FileView } from './ui/FileView';
@@ -101,6 +102,24 @@ export default function App() {
             }),
           );
           if (myId !== loadIdRef.current) return;
+
+          // 工作区根 `/workspaces`：把 UUID 子目录翻译成「会话标题 · 日期」。
+          // 工作区目录 `/workspaces/<uuid>`：解析顶部信息条。两者共用一次批量查库。
+          if (isWorkspacesRoot(p)) {
+            const uuids = entries.filter((e) => e.isDir).map((e) => e.name);
+            const workspaceLabels = await resolveWorkspaceLabels(uuids);
+            if (myId !== loadIdRef.current) return;
+            setView({ kind: 'dir', path: p, entries, workspaceLabels });
+            return;
+          }
+          const uuid = workspaceUuidOf(p);
+          if (uuid) {
+            const labels = await resolveWorkspaceLabels([uuid]);
+            if (myId !== loadIdRef.current) return;
+            setView({ kind: 'dir', path: p, entries, workspaceRow: labels.get(uuid) });
+            return;
+          }
+
           setView({ kind: 'dir', path: p, entries });
           return;
         }
@@ -252,7 +271,14 @@ export default function App() {
               </div>
             )}
 
-            {view.kind === 'dir' && <DirView path={view.path} entries={view.entries} />}
+            {view.kind === 'dir' && (
+              <DirView
+                path={view.path}
+                entries={view.entries}
+                workspaceLabels={view.workspaceLabels}
+                workspaceRow={view.workspaceRow}
+              />
+            )}
 
             {view.kind === 'file' && <FileView path={view.path} media={view.media} />}
 
