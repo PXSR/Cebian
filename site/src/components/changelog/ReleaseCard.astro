@@ -50,8 +50,8 @@ const anchor = r.unreleased ? 'unreleased' : r.version;
   .grp li { position: relative; padding-left: 18px; font-size: 15px; line-height: 1.6; color: var(--ink); }
   .grp li::before { content: ""; position: absolute; left: 3px; top: 10px; width: 5px; height: 5px; border-radius: 50%; background: var(--line-2); }
   .grp li :global(code) { font-family: var(--font-mono); font-size: 0.86em; background: var(--surface-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; color: var(--accent); }
-  .grp li :global(.cl-ref) { font-family: var(--font-mono); font-size: 0.86em; color: var(--accent); font-weight: 600; }
-  .grp li :global(.cl-ref:hover) { text-decoration: underline; }
+  .grp li :global(a) { color: var(--accent); text-decoration: underline; }
+  .grp li :global(.cl-ref) { font-family: var(--font-mono); font-size: 0.86em; font-weight: 600; }
 
   [data-theme="dark"] .grp-added h3, [data-theme="dark"] .grp-added .pip { color: #4cc585; }
   [data-theme="dark"] .grp-added .pip { background: #4cc585; }

@@ -67,6 +67,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 工具执行中点击停止后，工具卡片不再一直显示加载图标，「已取消」提示也移到工具卡片下方 ([#21](https://github.com/maotoumao/Cebian/pull/21))
 - 询问用户/权限确认卡片的文本现在保留换行，多行时图标与首行对齐 ([#23](https://github.com/maotoumao/Cebian/pull/23))
 - 文件编辑页窄屏布局下，右键删除文件时不再误把该文件重新打开 ([#22](https://github.com/maotoumao/Cebian/pull/22))
+- 修复文件树右键菜单点击事件冒泡到行的问题，避免选择删除时误触发文件打开 ([#25](https://github.com/maotoumao/Cebian/pull/25) by [@Matsuko97](https://github.com/Matsuko97))
 - 修复 AI 偶尔不读取页面、凭记忆编造链接就跳转的问题：现在要求链接地址必须来自页面真实 \`href\`、用户输入或工具结果，仅允许基于页面上可见样本的推导（如可见的 \`?page=2\` 翻到 \`?page=3\`），并在跳转失败时回退到重新读取页面
 - 修复「关于」页与更新提示里的安装指南链接指向失效旧地址的问题（现指向重构后的文档站安装页），并按界面语言正确区分简体 / 繁体 / 英文
 
@@ -76,13 +77,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Preserve line breaks in ask-user and permission-prompt card text, and align the icon to the first line for multi-line text ([#23](https://github.com/maotoumao/Cebian/pull/23))
 - Fixed the AI occasionally navigating to a URL invented from memory instead of reading the page: link addresses must now come from a real page \`href\`, user input, or a tool result, with derivation allowed only from a sample visible on the page (e.g. bumping a visible \`?page=2\` to \`?page=3\`), and a fallback to re-read the page when navigation fails
 - File editor: deleting a file from the right-click menu no longer spuriously reopens it in the compact (narrow) layout ([#22](https://github.com/maotoumao/Cebian/pull/22))
+- Fixed right-click context menu clicks bubbling to the file row, which could accidentally open a file when selecting Delete ([#25](https://github.com/maotoumao/Cebian/pull/25) by [@Matsuko97](https://github.com/Matsuko97))
 - Fixed the install-guide link in the About page and update notice pointing at a dead old URL (now points at the rebuilt docs site's installation page), and route it to the correct Simplified / Traditional Chinese / English variant per UI language
 
 ### 变更 / Changed
 
 - 升级 pi-agent-core / pi-ai 至 0.79.9（含 GitHub Copilot OAuth 可用模型列表改用登录账号自身的模型目录等修复）
+- Skills 技能索引迁入会话级 system prompt，充分命中浏览器 prompt cache，降低安装较多 skill 时的单次请求开销 ([#24](https://github.com/maotoumao/Cebian/pull/24) by [@Matsuko97](https://github.com/Matsuko97))
 
 - Upgrade pi-agent-core and pi-ai to 0.79.9 (includes fixes such as GitHub Copilot OAuth model availability now using the signed-in account's own model catalog)
+- Moved the skills index into the session-level system prompt to better hit the browser's prompt cache, reducing per-request overhead when many skills are installed ([#24](https://github.com/maotoumao/Cebian/pull/24) by [@Matsuko97](https://github.com/Matsuko97))
 
 ## 1.3.2 - 2026-06-14
 
