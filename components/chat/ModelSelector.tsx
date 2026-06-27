@@ -76,7 +76,7 @@ export function ModelSelector({
       }}
     >
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="xs" className="text-[0.7rem]">
+        <Button variant="ghost" size="xs" className="text-xs">
           {activeModelName ?? t('chat.model.select')}
           <ChevronDown data-icon />
         </Button>

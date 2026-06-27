@@ -30,9 +30,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - 升级核心 AI 引擎 pi-ai / pi-agent-core 至 0.80，跟进上游的模型目录更新与服务商兼容性修复；同步升级构建工具链（WXT、CodeMirror）
 - 优化 AI 的联网搜索：现在优先用通用搜索引擎（Bing / Brave / Google / DuckDuckGo，中文场景以百度兜底）并直接定位搜索结果区读取，不再默认在当前网站里搜、也不再靠猜域名乱开标签页，找网站和资料更快更准
+- 适当放大侧边栏中偏小的图标与文字：输入框工具栏图标、发送按钮图标、模型名称略微加大，输入框最小高度与工具栏内边距也略有增加，整体更清晰、点按更从容
 
 - Upgraded the core AI engine (pi-ai / pi-agent-core) to 0.80, picking up upstream model-catalog refreshes and provider compatibility fixes; also bumped the build toolchain (WXT, CodeMirror)
 - Improved the AI's web search: it now prefers a general search engine (Bing / Brave / Google / DuckDuckGo, with Baidu as a Chinese fallback) and reads the results region directly instead of searching within the current site or guessing domains and opening dead tabs — finding sites and information faster and more accurately
+- Slightly enlarged several under-sized sidepanel icons and texts: the composer toolbar icons, send button icon, and model name are a touch bigger, and the composer's minimum height and toolbar padding were increased a little, for a clearer, roomier feel
 
 ### 修复 / Fixed
 

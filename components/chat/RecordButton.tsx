@@ -62,7 +62,7 @@ export function RecordButton({ disabled }: RecordButtonProps) {
         // letting the user free up the tab observer.
         className="text-rose-500 hover:text-rose-400 hover:bg-rose-500/10"
       >
-        <CircleDot className="size-3.5 animate-pulse" />
+        <CircleDot className="size-4 animate-pulse" />
       </Button>
     );
   }
@@ -78,7 +78,7 @@ export function RecordButton({ disabled }: RecordButtonProps) {
       onClick={start}
       disabled={disabled}
     >
-      <CircleDot className="size-3.5" />
+      <CircleDot className="size-4" />
     </Button>
   );
 }

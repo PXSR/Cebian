@@ -276,7 +276,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   }, [speechActive, finalizePendingInterim, speech]);
 
   // Auto-resize textarea. When the value is empty (initial mount, after
-  // send) we clear the inline height entirely and let CSS `min-h-11 /
+  // send) we clear the inline height entirely and let CSS `min-h-13 /
   // max-h-37.5` drive sizing. This avoids a first-paint race in the
   // sidepanel where `scrollHeight` is read before fonts / Tailwind / the
   // first layout pass have stabilized — in that window the textarea is
@@ -867,7 +867,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
 
       <div className="border border-border rounded-xl bg-card focus-within:border-border/80 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
         {/* Top row: tools + attachments */}
-        <div className="flex items-center gap-1 px-2 pt-2 pb-2">
+        <div className="flex items-center gap-1 px-2.5 pt-2.5 pb-2">
           {/* Tool icons */}
           <Button
             variant="ghost"
@@ -877,7 +877,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             disabled={isDispatching}
             className={isPicking ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}
           >
-            <MousePointer2 className="size-3.5" />
+            <MousePointer2 className="size-4" />
           </Button>
           <RecordButton disabled={isDispatching} />
           <Tooltip>
@@ -892,7 +892,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                   onClick={handleScreenshot}
                   disabled={isDispatching || !supportsImage}
                 >
-                  <Camera className="size-3.5" />
+                  <Camera className="size-4" />
                 </Button>
               </span>
             </TooltipTrigger>
@@ -901,7 +901,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             </TooltipContent>
           </Tooltip>
           <Button variant="ghost" size="icon-xs" title={t('chat.composer.uploadFile')} onClick={() => fileInputRef.current?.click()} disabled={isDispatching}>
-            <Paperclip className="size-3.5" />
+            <Paperclip className="size-4" />
           </Button>
           <input
             ref={fileInputRef}
@@ -920,7 +920,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             onClick={toggleMobile}
             disabled={isDispatching}
           >
-            <Smartphone className="size-3.5" />
+            <Smartphone className="size-4" />
           </Button>
 
           {attachments.length > 0 && (
@@ -1027,7 +1027,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           onPaste={handlePaste}
           placeholder={t('chat.composer.placeholder')}
           disabled={isDispatching}
-          className="w-full bg-transparent border-none outline-none resize-none text-foreground text-[0.85rem] px-3 py-2 min-h-11 max-h-37.5 leading-relaxed placeholder:text-muted-foreground/50"
+          className="w-full bg-transparent border-none outline-none resize-none text-foreground text-[0.85rem] px-3 py-2 min-h-13 max-h-37.5 leading-relaxed placeholder:text-muted-foreground/50"
         />
 
         {/* Bottom row: actions */}
@@ -1063,7 +1063,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 onClick={() => onCancel?.()}
                 className="hover:shadow-xs"
               >
-                <Square className="size-3" fill="currentColor" />
+                <Square className="size-3.5" fill="currentColor" />
               </Button>
             ) : (
               <Button
@@ -1074,7 +1074,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 aria-label={t('common.send')}
                 className="bg-foreground text-background hover:bg-primary hover:text-primary-foreground hover:shadow-xs disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                <Send className="size-3" />
+                <Send className="size-3.5" />
               </Button>
             )}
           </div>
