@@ -22,19 +22,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - 文件浏览器现在把会话工作区目录（原本是一串 UUID）显示成「会话标题 · 日期」，并在进入某个工作区时于顶部展示该会话的标题与创建时间，让 AI 生成的文档更好找；设置新增「文件系统」一节，显示虚拟文件系统已用空间，并可一键打开文件浏览器 ([#26](https://github.com/maotoumao/Cebian/pull/26))
 - AI 现在可以用 ask_user 一次性弹出包含多道问题的表单：每题可设单选 / 多选 / 自由文本，并可把某个选项设为默认；用户左右翻页填写、在最后一题统一提交，替代以往多轮逐个提问 ([#28](https://github.com/maotoumao/Cebian/issues/28))
+- 新增「压缩模型」设置（设置 → 高级）：可单独指定上下文压缩（自动摘要过长对话）所用的模型，默认与对话模型相同，方便改用更小更省的模型来跑后台摘要 ([#40](https://github.com/maotoumao/Cebian/issues/40))
 
 - The file browser now shows session workspace folders (previously raw UUIDs) as "conversation title · date", and displays the conversation's title and creation time at the top when you open a workspace, making AI-generated documents easier to find; Settings gains a "Filesystem" section that shows used space and opens the file browser in one click ([#26](https://github.com/maotoumao/Cebian/pull/26))
 - The AI can now use ask_user to present a single form containing multiple questions: each can be single-select, multi-select, and/or free text, with an option markable as the default; you page through them and submit on the last question, replacing the old one-question-at-a-time prompts ([#28](https://github.com/maotoumao/Cebian/issues/28))
+- Added a "Compaction model" setting (Settings → Advanced): you can pick a separate model for context compaction (auto-summarizing overly long conversations), defaulting to the conversation model, so a smaller and cheaper model can handle background summaries ([#40](https://github.com/maotoumao/Cebian/issues/40))
 
 ### 变更 / Changed
 
 - 升级核心 AI 引擎 pi-ai / pi-agent-core 至 0.80，跟进上游的模型目录更新与服务商兼容性修复；同步升级构建工具链（WXT、CodeMirror）
 - 优化 AI 的联网搜索：现在优先用通用搜索引擎（Bing / Brave / Google / DuckDuckGo，中文场景以百度兜底）并直接定位搜索结果区读取，不再默认在当前网站里搜、也不再靠猜域名乱开标签页，找网站和资料更快更准
 - 统一并优化侧边栏对话区的图标按钮观感：输入框工具栏、发送/麦克风、复制/朗读/重试等按钮现在大小与内边距一致、点按更从容；模型名称、思考档文字略微加大，输入框最小高度也略有增加
+- 设置页顶部导航显示「纯图标」的宽度上限由 640px 提高到 800px：更宽的窗口下才切换为带文字的标签页
 
 - Upgraded the core AI engine (pi-ai / pi-agent-core) to 0.80, picking up upstream model-catalog refreshes and provider compatibility fixes; also bumped the build toolchain (WXT, CodeMirror)
 - Improved the AI's web search: it now prefers a general search engine (Bing / Brave / Google / DuckDuckGo, with Baidu as a Chinese fallback) and reads the results region directly instead of searching within the current site or guessing domains and opening dead tabs — finding sites and information faster and more accurately
 - Unified and refined the sidepanel chat icon buttons: the composer toolbar, send/mic, and copy/read-aloud/retry buttons now share a consistent size and padding for more comfortable tapping; the model name and thinking-level labels are a touch bigger, and the composer's minimum height was increased a little
+- Raised the width below which the Settings top navigation shows icon-only tabs from 640px to 800px, so labeled tabs now require a wider window
 
 ### 修复 / Fixed
 

@@ -117,6 +117,13 @@ export const lastSelectedModel = storage.defineItem<ModelIdentity | null>(
   { fallback: null },
 );
 
+/** 上下文压缩（摘要）专用模型。`null` = 跟随对话主模型（默认）。配置一个更小更省
+ *  的模型，可让后台压缩调用不必动用昂贵的主模型；解析失败时后台静默回退主模型。 */
+export const compactionModel = storage.defineItem<ModelIdentity | null>(
+  'local:compactionModel',
+  { fallback: null },
+);
+
 export const customProviders = storage.defineItem<CustomProviderConfig[]>(
   'local:customProviders',
   { fallback: [] },

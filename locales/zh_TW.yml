@@ -115,6 +115,10 @@ settings:
       xHandle: "@maotoumao0_0"
   advanced:
     title: "進階"
+    compaction:
+      label: "壓縮模型"
+      hint: "用於壓縮過長的對話，預設與對話模型相同。"
+      followMain: "與對話模型相同"
   instructions:
     title: "指引"
     label: "自訂指引"

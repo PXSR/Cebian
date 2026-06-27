@@ -26,7 +26,9 @@ import {
   runCompaction,
   createCompactionSummaryMessage,
   isCompactionSummary,
+  usableCompactionTarget,
   type CompactionSummaryMessage,
+  type CompactionTarget,
 } from '@/lib/agent/compaction';
 import { sessionStore } from './session-store';
 import { extractImages, type Attachment } from '@/lib/agent/attachments';
@@ -53,6 +55,7 @@ import {
   providerCredentials,
   customProviders as customProvidersStorage,
   lastSelectedModel,
+  compactionModel,
   lastSelectedThinkingLevel,
   userInstructions as userInstructionsStorage,
   type ModelIdentity,
@@ -328,6 +331,33 @@ class AgentManager {
     if (!model) return null;
 
     return { model, provider: modelCfg.provider, modelId: modelCfg.modelId };
+  }
+
+  /**
+   * 解析压缩（摘要）该用哪个模型 + 凭证。读全局 `compactionModel` 配置：
+   * - 未配置（null）→ 跟随主模型 `fallback`（默认语义）。
+   * - 配置了但解析不出（模型被删 / provider 没了）或无可用凭证 → console.warn
+   *   后静默回退主模型。压缩是后台增益，绝不因配错而中断本轮发送。
+   *
+   * 返回 `{ model, apiKey }`；apiKey 可能为 undefined（连主模型都无凭证），由
+   * maybeCompact 现有的「无 key 则裸发」分支处理。
+   */
+  private async resolveCompactionModel(fallback: Model<Api>): Promise<CompactionTarget> {
+    const configuredId = await compactionModel.getValue();
+    if (configuredId) {
+      const resolved = await this.resolveSessionModel(configuredId);
+      if (!resolved) {
+        console.warn('[compaction] configured model cannot be resolved (possibly deleted), falling back to main model', configuredId);
+      } else {
+        const apiKey = await resolveProviderApiKey(resolved.model.provider);
+        const usable = usableCompactionTarget({ model: resolved.model, apiKey });
+        if (usable) return usable;
+        console.warn('[compaction] configured model has no usable credentials, falling back to main model', configuredId);
+      }
+    }
+    // 回退主模型（未配置 / 解析失败 / 无凭证）：此刻才解析主模型凭证，避免配置可用时
+    // 对主 provider 做无谓的 OAuth 刷新。
+    return { model: fallback, apiKey: await resolveProviderApiKey(fallback.provider) };
   }
 
   /** Get or create a managed agent for a session */
@@ -793,8 +823,9 @@ class AgentManager {
     });
 
     try {
-      const apiKey = await resolveProviderApiKey(model.provider);
-      // 取消优先：apiKey 解析期间被 cancel，丢弃压缩并让调用方放弃本轮。
+      // 解析压缩模型：配置了专用小模型且凭证可用就用它，否则回退主模型（静默）。
+      const { model: compactModel, apiKey } = await this.resolveCompactionModel(model);
+      // 取消优先：解析期间被 cancel，丢弃压缩并让调用方放弃本轮。
       if (signal.aborted) return await this.commitCompactionCancel(managed, pendingUserMessage);
       // 无凭证无法发起独立的摘要请求，本轮裸发、下一轮再尝试压缩（不致 400：
       // transformContext 仍会带上已有的最后一条摘要）。
@@ -808,7 +839,7 @@ class AgentManager {
 
       const summary = await runCompaction({
         messagesToSummarize,
-        model,
+        model: compactModel,
         apiKey,
         previousSummary,
         signal,

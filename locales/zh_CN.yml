@@ -115,6 +115,10 @@ settings:
       xHandle: "@maotoumao0_0"
   advanced:
     title: "高级"
+    compaction:
+      label: "压缩模型"
+      hint: "用于压缩过长的对话，默认与对话模型相同。"
+      followMain: "与对话模型相同"
   instructions:
     title: "指引"
     label: "自定义指引"

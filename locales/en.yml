@@ -119,6 +119,10 @@ settings:
       xHandle: "@maotoumao0_0"
   advanced:
     title: "Advanced"
+    compaction:
+      label: "Compaction model"
+      hint: "Used to compact long conversations. Defaults to the conversation model."
+      followMain: "Same as conversation model"
   instructions:
     title: "Instructions"
     label: "Custom instructions"

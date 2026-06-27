@@ -1039,7 +1039,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
               configuredProviders={providers}
               customProviders={customProviderList}
               onSelect={handleModelSelect}
-              onOpenSettings={onOpenSettings ?? (() => {})}
+              showAddModels
             />
             {isReasoningModel && (
               <ThinkingLevelSelector

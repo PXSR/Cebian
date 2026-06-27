@@ -9,7 +9,7 @@ import { useContainerWidth } from '@/hooks/useContainerWidth';
 import { t } from '@/lib/i18n';
 
 /** Breakpoints for the Settings hub layout. */
-const COMPACT_MAX = 640;   // below: compact (pills + master-detail)
+const COMPACT_MAX = 800;   // below: compact (pills + master-detail)
 const MEDIUM_MAX = 1200;   // below: medium (top icon+text tabs, two-column body)
 
 export type SettingsBreakpoint = 'compact' | 'medium' | 'wide';
@@ -35,8 +35,8 @@ interface SettingsLayoutProps {
  * SettingsLayout - shell for the Settings hub.
  *
  * Three responsive tiers:
- * - compact (<640px): top icon-only pills -> full-width Outlet (master-detail).
- * - medium (640-1200): top icon+text tabs -> full-width Outlet (two-column still).
+ * - compact (<800px): top icon-only pills -> full-width Outlet (master-detail).
+ * - medium (800-1200): top icon+text tabs -> full-width Outlet (two-column still).
  * - wide   (>=1200px): left labeled sidebar -> Outlet on the right.
  */
 export function SettingsLayout({ basePath, showBackButton = false, showOpenInTab = false, onBack }: SettingsLayoutProps) {

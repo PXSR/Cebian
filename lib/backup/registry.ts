@@ -9,6 +9,7 @@ import type { WxtStorageItem } from 'wxt/utils/storage';
 import type { RestoreStrategy } from './types';
 import {
   lastSelectedModel,
+  compactionModel,
   customProviders,
   userInstructions,
   themePreference,
@@ -206,6 +207,7 @@ function entry<T>(e: BackupEntry<T>): BackupEntry<any> {
  */
 export const BACKUP_REGISTRY: BackupEntry<any>[] = [
   entry({ item: lastSelectedModel, storageClass: 'settings' }),
+  entry({ item: compactionModel, storageClass: 'settings' }),
   entry({
     item: customProviders,
     storageClass: 'settings',
