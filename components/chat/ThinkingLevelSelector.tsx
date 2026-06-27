@@ -32,7 +32,7 @@ export function ThinkingLevelSelector({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="xs" className="text-[0.7rem]">
+        <Button variant="ghost" size="xs" className="text-xs h-7">
           {t('chat.thinking.label', [currentLabel])}
           <ChevronDown data-icon />
         </Button>

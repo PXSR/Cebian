@@ -60,9 +60,9 @@ export function RecordButton({ disabled }: RecordButtonProps) {
         // Always allow stopping, even while the agent is running — losing
         // the recording because of an unrelated agent run is worse than
         // letting the user free up the tab observer.
-        className="text-rose-500 hover:text-rose-400 hover:bg-rose-500/10"
+        className="size-7 text-rose-500 hover:text-rose-400 hover:bg-rose-500/10"
       >
-        <CircleDot className="size-4 animate-pulse" />
+        <CircleDot className="size-3.5 animate-pulse" />
       </Button>
     );
   }
@@ -77,8 +77,9 @@ export function RecordButton({ disabled }: RecordButtonProps) {
       title={t('chat.recorder.start')}
       onClick={start}
       disabled={disabled}
+      className="size-7"
     >
-      <CircleDot className="size-4" />
+      <CircleDot className="size-3.5" />
     </Button>
   );
 }

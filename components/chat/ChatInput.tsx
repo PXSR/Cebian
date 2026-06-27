@@ -867,7 +867,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
 
       <div className="border border-border rounded-xl bg-card focus-within:border-border/80 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
         {/* Top row: tools + attachments */}
-        <div className="flex items-center gap-1 px-2.5 pt-2.5 pb-2">
+        <div className="flex items-center gap-0.5 px-2.5 pt-2.5 pb-2">
           {/* Tool icons */}
           <Button
             variant="ghost"
@@ -875,9 +875,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             title={isPicking ? t('chat.composer.cancelPick') : t('chat.composer.pickElement')}
             onClick={handlePickElement}
             disabled={isDispatching}
-            className={isPicking ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}
+            className={`size-7 ${isPicking ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}`}
           >
-            <MousePointer2 className="size-4" />
+            <MousePointer2 className="size-3.5" />
           </Button>
           <RecordButton disabled={isDispatching} />
           <Tooltip>
@@ -891,8 +891,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                   size="icon-xs"
                   onClick={handleScreenshot}
                   disabled={isDispatching || !supportsImage}
+                  className="size-7"
                 >
-                  <Camera className="size-4" />
+                  <Camera className="size-3.5" />
                 </Button>
               </span>
             </TooltipTrigger>
@@ -900,8 +901,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
               {supportsImage ? t('chat.composer.screenshot') : t('chat.composer.modelNoImage')}
             </TooltipContent>
           </Tooltip>
-          <Button variant="ghost" size="icon-xs" title={t('chat.composer.uploadFile')} onClick={() => fileInputRef.current?.click()} disabled={isDispatching}>
-            <Paperclip className="size-4" />
+          <Button variant="ghost" size="icon-xs" title={t('chat.composer.uploadFile')} onClick={() => fileInputRef.current?.click()} disabled={isDispatching} className="size-7">
+            <Paperclip className="size-3.5" />
           </Button>
           <input
             ref={fileInputRef}
@@ -916,11 +917,11 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             variant="ghost"
             size="icon-xs"
             title={t('chat.composer.mobileMode')}
-            className={isActiveTabMobile ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}
+            className={`size-7 ${isActiveTabMobile ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}`}
             onClick={toggleMobile}
             disabled={isDispatching}
           >
-            <Smartphone className="size-4" />
+            <Smartphone className="size-3.5" />
           </Button>
 
           {attachments.length > 0 && (
@@ -1061,7 +1062,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 variant="destructive"
                 size="icon-xs"
                 onClick={() => onCancel?.()}
-                className="hover:shadow-xs"
+                className="size-7 hover:shadow-xs"
               >
                 <Square className="size-3.5" fill="currentColor" />
               </Button>
@@ -1072,7 +1073,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 onClick={handleSend}
                 disabled={!canSend || isDispatching}
                 aria-label={t('common.send')}
-                className="bg-foreground text-background hover:bg-primary hover:text-primary-foreground hover:shadow-xs disabled:opacity-30 disabled:cursor-not-allowed"
+                className="size-7 bg-foreground text-background hover:bg-primary hover:text-primary-foreground hover:shadow-xs disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <Send className="size-3.5" />
               </Button>

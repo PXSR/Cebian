@@ -57,8 +57,8 @@ export function MicButton({ state, onClick, disabled }: MicButtonProps) {
             aria-pressed={listening}
             className={
               listening
-                ? 'relative bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary'
-                : ''
+                ? 'size-7 relative bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary'
+                : 'size-7'
             }
           >
             {preparing ? (
