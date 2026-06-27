@@ -410,6 +410,12 @@ chat:
     autoStoppedTime: "Recording auto-stopped: time limit reached"
   askUser:
     placeholder: "Type a reply…"
+    # Multi-question form (paged): navigation + per-question affordances
+    previous: "Previous"
+    next: "Next"
+    submit: "Submit"
+    skipped: "Skipped"
+    multiHint: "Select all that apply"
   permission:
     # Permission prompt shown before a skill script runs. $1 = skill name, $2 = script path
     title: "Skill $1 wants to run $2"

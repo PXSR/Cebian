@@ -406,6 +406,12 @@ chat:
     autoStoppedTime: "錄製已自動停止：達到時長上限"
   askUser:
     placeholder: "輸入回覆…"
+    # 多問題表單（翻頁）：導覽 + 每題互動
+    previous: "上一題"
+    next: "下一題"
+    submit: "提交"
+    skipped: "已跳過"
+    multiHint: "可多選"
   permission:
     # 技能腳本執行前的授權提示。$1 = 技能名，$2 = 腳本路徑
     title: "技能 $1 想要執行 $2"

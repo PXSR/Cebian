@@ -1,5 +1,5 @@
-import { Bot, ChevronRight, Lightbulb, CircleHelp, CheckCircle, Send, Crosshair, FileText, Film, FoldVertical, ShieldAlert } from 'lucide-react';
-import { useState, useEffect, useRef, useMemo, type ReactNode, type KeyboardEvent } from 'react';
+import { Bot, ChevronRight, Lightbulb, CheckCircle, Crosshair, FileText, Film, FoldVertical, ShieldAlert } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MarkdownRenderer } from '@/components/common/MarkdownRenderer';
@@ -257,10 +257,9 @@ export function ThinkingBlock({ content, isLive }: { content: string; isLive?: b
   );
 }
 
-/* ─── Shared option button ─── */
-// 交互卡片（AskUserBlock / PermissionRequestBlock）共用的小号选项按钮。
-// `selected` 用 default 实心高亮表达「这个选项被选中了」（权限卡片决策后用），
-// AskUserBlock 不传 selected 即普通 outline 按钮。
+/* ─── Permission option button ─── */
+// 权限卡片（PermissionRequestBlock）的小号选项按钮。`selected` 用 default 实心高亮
+// 表达「这个选项被选中了」（权限卡片决策后高亮被选的那个）。
 function PromptOptionButton({
   label,
   description,
@@ -285,95 +284,6 @@ function PromptOptionButton({
     >
       {label}
     </Button>
-  );
-}
-
-/* ─── Ask User Block (interactive tool UI) ─── */
-export function AskUserBlock({
-  question,
-  options,
-  allowFreeText = true,
-  answered,
-  onSelect,
-}: {
-  question: string;
-  options?: { label: string; description?: string }[];
-  allowFreeText?: boolean;
-  answered?: boolean;
-  onSelect?: (text: string) => void;
-}) {
-  const [freeText, setFreeText] = useState('');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const handleFreeTextSubmit = () => {
-    if (!freeText.trim()) return;
-    onSelect?.(freeText.trim());
-    setFreeText('');
-  };
-
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleFreeTextSubmit();
-    }
-  };
-
-  return (
-    <div className={`relative mt-3 p-3.5 border border-primary/20 bg-primary/5 rounded-lg ${answered ? 'opacity-60' : ''}`}>
-      <div className="flex items-start gap-2 text-primary font-medium text-[0.85rem] mb-1.5">
-        <CircleHelp className="size-4.5 shrink-0 mt-0.5" />
-        <span className="whitespace-pre-wrap">{question}</span>
-      </div>
-
-      {/* Option buttons */}
-      {(() => {
-        // Defensive: model may stream partial JSON or return wrong type (string / object).
-        // Only render when options is a real array of objects with a label.
-        const safeOptions = Array.isArray(options)
-          ? options.filter((o): o is { label: string; description?: string } =>
-              !!o && typeof o === 'object' && typeof (o as { label?: unknown }).label === 'string'
-            )
-          : [];
-        if (safeOptions.length === 0) return null;
-        return (
-          <div className="flex flex-wrap gap-2 mt-2.5">
-            {safeOptions.map((opt, i) => (
-              <PromptOptionButton
-                key={`${i}-${opt.label}`}
-                label={opt.label}
-                description={opt.description}
-                disabled={!onSelect}
-                onClick={onSelect ? () => onSelect(opt.label) : undefined}
-              />
-            ))}
-          </div>
-        );
-      })()}
-
-      {/* Free text input */}
-      {allowFreeText && onSelect && (
-        <div className="flex items-end gap-1.5 mt-2.5">
-          <textarea
-            ref={textareaRef}
-            value={freeText}
-            onChange={(e) => setFreeText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={t('chat.askUser.placeholder')}
-            rows={1}
-            className="flex-1 resize-none bg-background border border-border rounded-md px-2.5 py-1.5 text-xs leading-relaxed placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
-          />
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={handleFreeTextSubmit}
-            disabled={!freeText.trim()}
-            className="shrink-0"
-          >
-            <Send className="size-3" />
-          </Button>
-        </div>
-      )}
-    </div>
   );
 }
 
