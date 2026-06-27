@@ -17,7 +17,13 @@ All tasks must follow a plan-first approach:
 
 ## Task Execution Workflow
 
-Once a plan is approved, execution must follow this strict per-task gating cycle. **Never** batch multiple tasks together or skip ahead.
+Once a plan is approved, execution must follow this strict per-task gating cycle. **Never** batch multiple subtasks together or skip ahead.
+
+> **🛑 HARD STOP after every subtask (non-negotiable).** The moment you finish ONE subtask's implementation + its `code-review` pass and have posted its testing instructions, you **MUST end your turn and wait**. In that same turn you may **not** start, plan, scaffold, refactor toward, or "get a head start on" the next subtask — stop completely.
+>
+> This holds **even when the user has already said "do all of them", "do them in order", "都做", "继续", "按顺序处理", or approved the overall plan.** A blanket go-ahead approves the **plan**, not the individual subtask gates — each subtask still needs its **own explicit** per-subtask approval (e.g. "next", "approved", "通过", "下一个") before you touch the following one. "Do them in order" means "in this order, one gated stop at a time", **never** "do them back-to-back without stopping".
+>
+> If you catch yourself about to begin a second subtask in one turn — or rationalizing that the user "clearly wants all of it" — that is the violation. Stop and hand control back. When unsure whether something counts as a new subtask, assume it does and stop.
 
 1. **Split into subtasks** — Break the approved plan into concrete, individually verifiable subtasks. Use the `manage_todo_list` tool to create a TODO list so progress is visible to the user.
 2. **One task at a time** — Mark exactly one subtask as `in-progress` and complete only that subtask before touching the next. Do not start subsequent tasks in the same turn.
