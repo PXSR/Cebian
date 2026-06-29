@@ -49,6 +49,10 @@ const PROMPT_RECONNECT_TIMEOUT_MS = 1_500;
 export interface AgentPortCallbacks {
   onSessionCreated?: (sessionId: string, title: string) => void;
   onSessionLoaded?: (session: SessionRecord | null) => void;
+  /** 重新订阅一个仍有活 agent 的会话时，后台走 `session_state`（带消息但非完整
+   *  会话行）。这里把该会话的 provider / model / 思考档单独回传，供上层回填本地的
+   *  turn 草稿——与 `onSessionLoaded` 对齐，修复「发消息后进设置再返回模型被重置」。 */
+  onSessionSettings?: (provider: string, model: string, thinkingLevel: string) => void;
   onSessionList?: (sessions: SessionMeta[]) => void;
   onSessionDeleted?: (sessionId: string) => void;
 }
@@ -133,6 +137,10 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
             isAgentRunning: msg.isRunning,
             isCompacting: msg.isCompacting ?? false,
           }));
+          // 模型字段同样仅首次订阅携带（mid-stream rebuild 省略），用以回填 turn 草稿。
+          if (msg.provider !== undefined) {
+            callbacksRef.current.onSessionSettings?.(msg.provider, msg.model ?? '', msg.thinkingLevel ?? '');
+          }
           break;
 
         case 'agent_start':

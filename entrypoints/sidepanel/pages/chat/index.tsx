@@ -80,6 +80,14 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     return () => { mounted = false; };
   }, [isNewChat]);
 
+  // 把会话行存的选择 seed 进本地 turn 草稿。provider / model 为空（旧会话 / 旧备份）
+  // 时置 null，让发送门禁拦下来提示用户重选。onSessionLoaded（首次加载）与
+  // onSessionSettings（重订阅活 agent 走 session_state）共用同一逻辑。
+  const seedTurnFromSession = useCallback((provider?: string, model?: string, thinkingLevel?: string) => {
+    setTurnModel(provider && model ? { provider, modelId: model } : null);
+    setTurnThinking((thinkingLevel as ThinkingLevel) || 'medium');
+  }, []);
+
   // 切模型 / 思考档：更新本地草稿 + 回写全局种子（供下一个新对话用，fire-and-forget）。
   // 不在此落库到会话行——那是发送 / 重试时由 turn 随消息带给后台做的（carry-on-message）。
   const handleModelChange = useCallback((m: ModelIdentity) => {
@@ -118,9 +126,13 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
       }
       // 已有会话：本地草稿 seed 自会话行自己存的选择（而非全局）。模型 / provider
       // 为空（旧会话 / 旧备份）时置 null，让发送门禄拦下来提示用户重选。
-      setTurnModel(session.provider && session.model ? { provider: session.provider, modelId: session.model } : null);
-      setTurnThinking((session.thinkingLevel as ThinkingLevel) || 'medium');
-    }, [navigate]),
+      seedTurnFromSession(session.provider, session.model, session.thinkingLevel);
+    }, [navigate, seedTurnFromSession]),
+    // 重新订阅一个仍有活 agent 的会话时，后台走 session_state（不带完整会话行），
+    // 由它单独回传该会话的模型 / 思考档来 seed——与 onSessionLoaded 同样的逻辑。
+    onSessionSettings: useCallback((provider: string, model: string, thinkingLevel: string) => {
+      seedTurnFromSession(provider, model, thinkingLevel);
+    }, [seedTurnFromSession]),
   });
 
   const { messages, isAgentRunning, isCompacting, sessionId: activeSessionId, sessionTitle, lastError } = state;

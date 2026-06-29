@@ -84,6 +84,12 @@ export type ServerMessage =
       type: 'session_state';
       sessionId: string;
       title?: string;
+      /** 会话所用的 provider / model / 思考档。与 `title` 同语义：仅在首次订阅时
+       *  （从 DB 行读出）携带，供 sidepanel 回填本地的 turn 草稿；mid-stream 的
+       *  rebuild 广播一律省略，避免覆盖用户在途切换的选择。 */
+      provider?: string;
+      model?: string;
+      thinkingLevel?: string;
       messages: AgentMessage[];
       isRunning: boolean;
       /** 是否正处于发送前的上下文压缩步骤（状态层正在生成并插入摘要）。
