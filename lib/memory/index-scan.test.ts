@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildMemoriesBlock, memoryAge, renderUserProfileBlock, USER_PROFILE_FILE } from '@/lib/memory/index-scan';
-import { parseMemoryType, type MemoryMeta } from '@/lib/memory/types';
+import { buildMemoriesBlock, memoryAge, renderUserProfileBlock } from '@/lib/memory/index-scan';
+import { parseMemoryType, USER_PROFILE_FILE, type MemoryMeta } from '@/lib/memory/types';
 
 const DAY = 86_400_000;
 const NOW = 1_700_000_000_000; // 固定 now，保证年龄渲染可断言

@@ -66,7 +66,13 @@ export type ClientMessage =
    *  Returns via `mcp_resource_result` matched on `requestId`. The reply
    *  is sent only to the requesting port, not broadcast — each chat
    *  message renders its own iframe and tracks its own pending read. */
-  | { type: 'mcp_read_resource'; requestId: string; serverId: string; uri: string };
+  | { type: 'mcp_read_resource'; requestId: string; serverId: string; uri: string }
+  /** 手动触发一次跨对话记忆整理。后台跨同时只跑一个（单飞行）；进度由
+   *  `memory_organize_state` 广播，结果（diff/摘要）写入 memoryOrganizeState 供 UI 响应式读取。 */
+  | { type: 'memory_organize' }
+  /** 查当前是否正在整理（供设置页重新挂载时恢复「整理中」指示——切 tab 再切回不丢状态）。
+   *  后台仅向发起端口回一条 `memory_organize_state`（不带 outcome，不触发 toast）。 */
+  | { type: 'memory_organize_query' };
 
 // ─── Background → Client (events) ───
 
@@ -135,4 +141,13 @@ export type ServerMessage =
       requestId: string;
       result?: MCPResourceContents;
       error?: { code: 'server_unavailable' | 'fetch_failed'; message: string };
+    }
+  /** 记忆整理的运行态（全局、非会话维度）。running 驱动设置页「整理中…」指示；
+   *  结束时携 outcome 供 UI toast 反馈（空转/冲突/失败等）；error 在出错时携一句话说明。
+   *  结果详情（diff/摘要）走 memoryOrganizeState。 */
+  | {
+      type: 'memory_organize_state';
+      running: boolean;
+      outcome?: 'ok' | 'empty' | 'conflict' | 'rejected' | 'failed' | 'no-model';
+      error?: string;
     };

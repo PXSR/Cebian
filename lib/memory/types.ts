@@ -8,6 +8,13 @@ export const MEMORY_TYPES = ['user', 'feedback', 'context', 'reference'] as cons
 
 export type MemoryType = (typeof MEMORY_TYPES)[number];
 
+/** 唯一常驻档的固定文件名：核心身份多槽事实写这一个，全文每轮注入。 */
+export const USER_PROFILE_FILE = 'user_profile.md';
+
+/** user_profile.md 的固定 description：恒为此值、不枚举会变的事实（它不参与召回）。
+ *  提示词指令与整理校验器共用此常量,保证「指令要求的」与「校验器强制的」逐字一致。 */
+export const USER_PROFILE_DESCRIPTION = "the user's core profile";
+
 /**
  * 把 frontmatter 里的原始 `type` 值解析成 MemoryType。
  * 非字符串 / 未知值返回 undefined——缺失或非法 type 的记忆仍纳入索引（宽容降级），

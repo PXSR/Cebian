@@ -141,6 +141,21 @@ settings:
     enable: "啟用記憶"
     hint: "跨對話記憶，預設關閉。啟用後助手會跨會話自動儲存並調用關於你的長期資訊。"
     newBody: "（在此撰寫記憶內容）"
+    organize:
+      title: "整理記憶"
+      hint: "一次合併重複、清理過時、整理你的記憶檔案。"
+      button: "整理"
+      running: "整理中…"
+      model: "模型"
+      followActive: "與對話模型相同"
+      # $1 = 上次整理時間
+      lastRun: "上次整理 $1"
+      toast:
+        ok: "記憶已整理"
+        empty: "沒有需要整理的記憶"
+        conflict: "整理期間記憶有變動，已跳過，請稍後重試"
+        noModel: "未設定可用模型，無法整理記憶"
+        failed: "記憶整理失敗"
   skills:
     title: "技能"
     newBody: "（在此處撰寫技能指令）"

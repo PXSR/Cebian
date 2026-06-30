@@ -88,7 +88,7 @@ export async function collectStorage(opts: {
  *    - `replace`：用备份 safe 覆盖（config 视为不可信输入，混合 item 先重新剥一次，
  *      丢弃任何残留密钥，只写 safe，token 留空）。
  *    - `merge`：仅对声明了 `fillMissing` 的 item（列表型，如 customProviders /
- *      mcpServers）按 id 补缺；未声明的标量项保留本地、不写（§6）。
+ *      mcpServers）按 id 补缺；未声明的标量项保留本地、不写。
  * 2. 密钥（随 credentials 分类，独立于 settings）：
  *    - credentials-class item：`replace` 覆盖；`merge` 调 `fillMissing` 补缺。
  *    - 混合 item（settings-class 但 secret 在 credentials.json）：调 `restoreSecret`

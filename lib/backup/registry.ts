@@ -22,6 +22,7 @@ import {
   updateNoticeState,
   pendingChangelogVersion,
   memorySettings,
+  memoryOrganizeState,
   type MCPServerConfig,
   type ProviderCredentials,
   type WebDavConfig,
@@ -251,6 +252,7 @@ export const BACKUP_REGISTRY: BackupEntry<any>[] = [
   }),
   // 记忆系统设置（仅开关，无密钥）。merge 恢复时保留本地开关状态（无 fillMissing）。
   entry({ item: memorySettings, storageClass: 'settings' }),
+  entry({ item: memoryOrganizeState, storageClass: 'exclude' }),
   entry({ item: settingsFilePanelWidth, storageClass: 'exclude' }),
   entry({ item: lastSettingsSection, storageClass: 'exclude' }),
   entry({ item: updateNoticeState, storageClass: 'exclude' }),

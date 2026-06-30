@@ -1,11 +1,23 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
-import { FileWorkspace } from './FileWorkspace';
+import { FileWorkspace, type FileWorkspaceHandle } from './FileWorkspace';
+import { ModelSelector } from '@/components/chat/ModelSelector';
 import { encodeRelPath } from '@/lib/persistence/vfs';
 import { CEBIAN_MEMORIES_DIR } from '@/lib/persistence/vfs-paths';
-import { settingsFilePanelWidth, memorySettings } from '@/lib/persistence/storage';
+import {
+  settingsFilePanelWidth,
+  memorySettings,
+  memoryOrganizeState,
+  resolveOrganizeSettings,
+  providerCredentials,
+  customProviders,
+  type MemorySettings,
+  type ModelIdentity,
+} from '@/lib/persistence/storage';
 import { useStorageItem } from '@/hooks/useStorageItem';
+import { useMemoryOrganize } from '@/hooks/useMemoryOrganize';
 import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import type { SettingsOutletContext } from '@/components/settings/SettingsLayout';
 import { t } from '@/lib/i18n';
@@ -18,6 +30,66 @@ type: user
 
 ${t('settings.memory.newBody')}
 `;
+
+/**
+ * 整理控制区：手动「整理」按钮 + 整理用模型选择 + 上次整理结果。
+ * 只在记忆开启时渲染。用户配置读 / 写 memorySettings.organize；运行结果读 memoryOrganizeState。
+ */
+function OrganizeControls({
+  settings,
+  setSettings,
+  onOrganized,
+}: {
+  settings: MemorySettings;
+  setSettings: (s: MemorySettings) => void;
+  onOrganized: () => void;
+}) {
+  const organize = resolveOrganizeSettings(settings);
+  const [state] = useStorageItem(memoryOrganizeState, {});
+  const [providers] = useStorageItem(providerCredentials, {});
+  const [customProviderList] = useStorageItem(customProviders, []);
+  const { running, trigger } = useMemoryOrganize(onOrganized);
+
+  const setModel = (model: ModelIdentity | undefined) =>
+    setSettings({ ...settings, organize: { ...organize, model } });
+
+  return (
+    <div className="mt-4 rounded-md border border-border p-3 space-y-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-sm font-medium">{t('settings.memory.organize.title')}</span>
+            {state.lastRunAt && (
+              <span className="text-xs text-muted-foreground">
+                {t('settings.memory.organize.lastRun', [new Date(state.lastRunAt).toLocaleString()])}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">{t('settings.memory.organize.hint')}</p>
+        </div>
+        <Button size="sm" variant="outline" disabled={running} onClick={trigger} className="shrink-0">
+          {running ? t('settings.memory.organize.running') : t('settings.memory.organize.button')}
+        </Button>
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <Label className="text-xs text-muted-foreground shrink-0">
+          {t('settings.memory.organize.model')}
+        </Label>
+        <ModelSelector
+          activeModel={organize.model ?? null}
+          configuredProviders={providers}
+          customProviders={customProviderList}
+          onSelect={(provider, modelId) => setModel({ provider, modelId })}
+          inheritOption={{
+            label: t('settings.memory.organize.followActive'),
+            onSelect: () => setModel(undefined),
+          }}
+        />
+      </div>
+    </div>
+  );
+}
 
 /**
  * MemorySection — 跨对话记忆管理页（/settings/memory[/*]）。
@@ -35,6 +107,7 @@ export function MemorySection() {
   // react-router v6 decodes splat params; fallback to '' means no file selected.
   const splat = params['*'] ?? '';
   const relativePath = splat || undefined;
+  const fileWsRef = useRef<FileWorkspaceHandle>(null);
 
   const handleSelect = useCallback((rel: string | null) => {
     if (rel) {
@@ -47,7 +120,7 @@ export function MemorySection() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div className="px-6 pt-6 pb-4 shrink-0 border-b border-border">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-base font-semibold">{t('settings.memory.title')}</h2>
             <p className="text-xs text-muted-foreground mt-0.5">{t('settings.memory.hint')}</p>
@@ -63,8 +136,16 @@ export function MemorySection() {
             />
           </div>
         </div>
+        {settings.enabled && (
+          <OrganizeControls
+            settings={settings}
+            setSettings={setSettings}
+            onOrganized={() => fileWsRef.current?.refresh()}
+          />
+        )}
       </div>
       <FileWorkspace
+        ref={fileWsRef}
         root={CEBIAN_MEMORIES_DIR}
         relativePath={relativePath}
         onSelectRelative={handleSelect}

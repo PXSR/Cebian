@@ -145,6 +145,21 @@ settings:
     enable: "Enable memory"
     hint: "Cross-conversation memory. Off by default; when on, the assistant saves and recalls durable facts about you across chats."
     newBody: "(Write the memory here)"
+    organize:
+      title: "Organize memory"
+      hint: "Merge duplicates, drop stale notes, and tidy your memory files in one pass."
+      button: "Organize"
+      running: "Organizing…"
+      model: "Model"
+      followActive: "Same as conversation model"
+      # $1 = last run time
+      lastRun: "Last organized $1"
+      toast:
+        ok: "Memory organized"
+        empty: "Nothing to organize"
+        conflict: "Memory changed during the run — skipped, try again"
+        noModel: "No usable model to organize memory"
+        failed: "Memory organize failed"
   skills:
     title: "Skills"
     newBody: "(Write your skill instructions here)"

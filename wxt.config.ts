@@ -5,6 +5,9 @@ import path from 'node:path';
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   modules: ['@wxt-dev/module-react', '@wxt-dev/i18n/module'],
+  dev: {
+    server: { port: 3210 },
+  },
   manifest: {
     default_locale: 'en',
     name: '__MSG_extName__',

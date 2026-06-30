@@ -209,16 +209,63 @@ export const webdavConfig = storage.defineItem<WebDavConfig | null>(
 
 // ─── 跨对话记忆（cross-conversation memory） ───
 
+/** 记忆整理（organize）的「用户配置」。运行结果（上次时间）分到 memoryOrganizeState，
+ *  避免后台写结果时读改写覆盖用户在设置页改的配置。`auto/intervalDays/minNewMemories` 现在
+ *  就落地、调度在 2b 接线（旧装机缺这些字段时由 `resolveOrganizeSettings` 补默认）。 */
+export interface MemoryOrganizeSettings {
+  /** 整理用模型；缺省回退当前活跃模型。 */
+  model?: ModelIdentity;
+  /** 自动整理开关（2b 接线；2a 仅落字段）。默认 false。 */
+  auto: boolean;
+  /** 自动整理最小间隔天数（2b）。默认 7。 */
+  intervalDays: number;
+  /** 距上次成功整理、新增/改动记忆达到此数才自动跑（2b）。默认 20。 */
+  minNewMemories: number;
+}
+
+/** 记忆整理的「运行结果态」（派生、非用户配置）。只有 organize manager 写它，故读改写无竞态；
+ *  备份无意义（exclude）。设置页响应式读取以展示「上次整理时间」。 */
+export interface MemoryOrganizeState {
+  /** 上次「成功」整理的时间（冲突/失败跳过不更新）。 */
+  lastRunAt?: number;
+  /** 上次「尝试」整理的时间（含冲突/失败跳过；2b 退避用，避免反复烧 token）。 */
+  lastAttemptAt?: number;
+}
+
 /**
- * 跨对话记忆系统的持久设置。Phase 1 仅 `enabled` 主开关；整理（organize）相关
- * 字段在 Phase 2 扩展（WXT 存储项有默认值兜底，加字段向后兼容）。
+ * 跨对话记忆系统的持久设置。`enabled` 是主开关；`organize` 是整理子结构。
+ *
+ * `organize` 故意可选：Phase 1 装机只存了 `{ enabled }`，WXT 的 fallback 仅在 key
+ * 整体缺失时生效、不会给「已存在但缺字段」的旧值补子结构（实测 version 迁移在旧值
+ * 无 version meta 时也不触发）。故读取整理设置一律走 `resolveOrganizeSettings`，由它
+ * 补默认值——这是唯一可靠且可测的回填点。
  */
 export interface MemorySettings {
-  /** 记忆系统总开关。关闭时不注入记忆提示/索引、后续整理调度不运行；文件工具层不做硬拦截。默认 false（隐私优先）。 */
+  /** 记忆系统总开关。关闭时不注入记忆提示/索引、整理调度不运行；文件工具层不做硬拦截。默认 false（隐私优先）。 */
   enabled: boolean;
+  /** 整理设置（旧装机可能缺；用 `resolveOrganizeSettings` 取规范值）。 */
+  organize?: MemoryOrganizeSettings;
+}
+
+/** organize 子结构的默认值（新装机 fallback + 旧装机回填共用单一真理源）。 */
+const DEFAULT_ORGANIZE: MemoryOrganizeSettings = {
+  auto: false,
+  intervalDays: 7,
+  minNewMemories: 20,
+};
+
+/** 取规范的整理设置：补齐旧装机缺失的 organize 子结构。所有整理逻辑读设置的唯一入口。 */
+export function resolveOrganizeSettings(s: MemorySettings): MemoryOrganizeSettings {
+  return { ...DEFAULT_ORGANIZE, ...s.organize };
 }
 
 export const memorySettings = storage.defineItem<MemorySettings>(
   'local:memorySettings',
-  { fallback: { enabled: false } },
+  { fallback: { enabled: false, organize: { ...DEFAULT_ORGANIZE } } },
+);
+
+/** 整理运行结果态（派生）。只有 organize manager 写；fallback 空对象。 */
+export const memoryOrganizeState = storage.defineItem<MemoryOrganizeState>(
+  'local:memoryOrganizeState',
+  { fallback: {} },
 );

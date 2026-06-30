@@ -204,7 +204,7 @@ function parseManifest(raw: Uint8Array): BackupManifest {
 
 /** 读取外层 zip 并取出 manifest 字节（不解密 payload）。当 manifest 标记加密时，
  *  强制外层只含 manifest.json + payload.enc（外加可忽略的目录/垃圾条目），否则
- *  视为破坏了容器不变量（§8.2）的非法包。 */
+ *  视为破坏了容器不变量的非法包。 */
 function openOuter(zipBytes: Uint8Array): {
   entries: Record<string, Uint8Array>;
   manifest: BackupManifest;

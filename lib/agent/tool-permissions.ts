@@ -33,7 +33,7 @@ import { CHROME_API_WHITELIST } from '@/lib/tools/chrome-api-whitelist';
  * - `dismissed`：用户没回应卡片、直接发了新消息——隐式未授权。
  *
  * `denied` 与 `dismissed` 都会阻止本次执行，区别只在给 LLM 的 reason 文案
- * 与 UI 卡片终态（拒绝=按钮高亮 / 发消息=整卡置灰），见 §UI（子任务 7）。
+ * 与 UI 卡片终态（拒绝=按钮高亮 / 发消息=整卡置灰）。
  */
 type PermissionDecision = 'once' | 'always' | 'denied' | 'dismissed';
 

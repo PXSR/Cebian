@@ -12,19 +12,29 @@ import { vfs, normalizePath } from '@/lib/persistence/vfs';
 import { CEBIAN_MEMORIES_DIR } from '@/lib/persistence/vfs-paths';
 import { escapeXml } from '@/lib/utils';
 import { parseFrontmatter } from '@/lib/content/frontmatter';
-import { type MemoryMeta, parseMemoryType } from './types';
+import { type MemoryMeta, parseMemoryType, USER_PROFILE_FILE } from './types';
 
 // ─── 常量 ───
 
 // 30 分钟，与 skills scanner 对齐。
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
-/** <memories> 块的注入上限——超出则截断（与 Claude Code 的 MEMORY.md 阈值对齐）。 */
-const MAX_INDEX_LINES = 200;
+/**
+ * <memories> 块的注入上限——超出则截断。**字节(25KB)是真实约束**：它封住每轮注入的
+ * token 天花板；行上限放得很宽，只防病态情形，不让它先于字节触顶（否则会把容量卡在
+ * ~30 个档，而 25KB 本可容 ~100 个）。
+ */
+const MAX_INDEX_LINES = 700;
 const MAX_INDEX_BYTES = 25_000;
 
+/**
+ * 索引在截断前大致能容纳的记忆档数（≈ MAX_INDEX_BYTES ÷ 单条 ~250 字节 ≈ 100）。
+ * 整理 agent 据此客观判断「离上限还有多远、该不该为省空间而合并」。是近似值、随上限走，
+ * 改 MAX_INDEX_BYTES 时一并复核此数。
+ */
+export const MEMORY_INDEX_FILE_CAPACITY = 100;
+
 /** 唯一常驻档：核心身份多槽事实写这一个，正文全文每轮注入，召回不靠 description 镜像。 */
-export const USER_PROFILE_FILE = 'user_profile.md';
 const USER_PROFILE_PATH = `${CEBIAN_MEMORIES_DIR}/${USER_PROFILE_FILE}`;
 /** 常驻全文字节上限——超限只注摘要 + 提示，不截前缀冒充完整（原文仍在索引可 fs_read）。 */
 const MAX_PROFILE_BYTES = 1500;

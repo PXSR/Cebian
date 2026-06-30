@@ -73,7 +73,7 @@ export function downloadFile(name: string, content: string | Blob | ArrayBuffer,
  *  in XML. Use the default for element text content; pass `{forAttribute:true}`
  *  for attribute values.
  *
- *  `>` is intentionally left raw in most cases — XML §2.4 only requires it
+ *  `>` is intentionally left raw in most cases — XML only requires it
  *  escaped in character data when it forms the sequence `]]>`, which we
  *  handle explicitly below. Keeping raw `>` saves noticeable tokens on
  *  selector-heavy payloads like recording bodies.
