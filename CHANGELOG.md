@@ -21,8 +21,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### 变更 / Changed
 
 - 把「压缩模型」设置重命名为「上下文压缩模型」，并优化说明文案，让它更明确是指「对话过长时用来自动压缩历史的模型」
+- 升级核心 AI 引擎 pi-ai / pi-agent-core 至 0.80.3，跟进上游服务商健壮性修复（长请求 token 上限、推理内容重放、更清晰的错误信息等）
 
 - Renamed the "Compaction model" setting to "Context compaction model" and refined its description to make clear it's the model used to automatically compact overly long conversations
+- Upgraded the core AI engine (pi-ai / pi-agent-core) to 0.80.3, picking up upstream provider robustness fixes (context-aware max-token caps, reasoning replay, clearer error messages, etc.)
 
 ## 1.4.0 - 2026-06-30
 
